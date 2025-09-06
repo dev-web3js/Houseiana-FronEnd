@@ -1,0 +1,684 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ ENUMS ============
+
+enum Tier {
+  standard
+  gold
+  premium
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+  IN_PROGRESS
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  PARTIALLY_PAID
+  REFUNDED
+  FAILED
+}
+
+enum UserRole {
+  guest
+  host
+  both
+  admin
+}
+
+enum PropertyType {
+  apartment
+  villa
+  studio
+  townhouse
+  penthouse
+  compound_villa
+  room
+}
+
+enum ListingStatus {
+  draft
+  pending_review
+  approved
+  active
+  inactive
+  suspended
+  deleted
+}
+
+enum VerificationStatus {
+  unverified
+  pending
+  verified
+  rejected
+}
+
+enum PayoutStatus {
+  pending
+  processing
+  completed
+  failed
+  cancelled
+}
+
+// ============ MODELS ============
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  
+  // Personal Info
+  firstName     String?
+  lastName      String?
+  name          String?   // Full name or display name
+  username      String?   @unique
+  phone         String?
+  phoneVerified Boolean   @default(false)
+  
+  // Role & Permissions
+  role          UserRole  @default(guest)
+  isHost        Boolean   @default(false)
+  isAdmin       Boolean   @default(false)
+  
+  // Host-specific fields
+  hostVerified      VerificationStatus @default(unverified)
+  hostSince         DateTime?
+  responseRate      Float?            // Percentage
+  responseTime      Int?              // Minutes
+  totalEarnings     Decimal?  @db.Decimal(12,2) @default(0)
+  
+  // Host Documents
+  governmentId      String?           // Encrypted
+  governmentIdType  String?           // qatar_id, passport
+  idVerifiedAt      DateTime?
+  propertyDocs      Json?             // Array of document URLs
+  tradeLicense      String?           // For business hosts
+  
+  // Banking (for hosts)
+  bankName          String?
+  accountNumber     String?           // Encrypted
+  accountHolderName String?
+  iban              String?           // Encrypted
+  swiftCode         String?
+  bankVerifiedAt    DateTime?
+  
+  // Profile
+  bio               String?   @db.Text
+  profileImage      String?
+  coverImage        String?
+  
+  // Preferences
+  language          String    @default("en")
+  currency          String    @default("QAR")
+  emailNotifications Boolean  @default(true)
+  smsNotifications  Boolean   @default(true)
+  pushNotifications Boolean   @default(true)
+  marketingEmails   Boolean   @default(false)
+  
+  // Security
+  twoFactorEnabled  Boolean   @default(false)
+  twoFactorSecret   String?   // Encrypted
+  
+  // Timestamps
+  emailVerifiedAt   DateTime?
+  lastLoginAt       DateTime?
+  lastActiveAt      DateTime?
+  suspendedAt       DateTime?
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  listings          Listing[]         @relation("HostListings")
+  bookings          Booking[]         @relation("GuestBookings")
+  reviews           Review[]          @relation("UserReviews")
+  receivedReviews   Review[]          @relation("ReceivedReviews")
+  messages          Message[]
+  payouts           HostPayout[]
+  listingDrafts     ListingDraft[]
+  favorites         FavoriteListing[]
+  searches          SearchHistory[]
+  notifications     Notification[]
+  sessions          Session[]
+  
+  @@index([email])
+  @@index([role])
+  @@index([isHost])
+  @@index([username])
+}
+
+model Listing {
+  id            String        @id @default(cuid())
+  hostId        String
+  status        ListingStatus @default(draft)
+  
+  // Basic Info
+  title         String
+  slug          String?       @unique
+  description   String        @db.Text
+  propertyType  PropertyType
+  entirePlace   Boolean       @default(true)
+  
+  // Location Details
+  country       String        @default("Qatar")
+  city          String
+  area          String?       // e.g., "West Bay", "The Pearl"
+  district      String?       // More specific area
+  
+  // Address (JSON for flexibility)
+  address       Json          // {building, street, area, zone, buildingNumber, unitNumber, postalCode}
+  coordinates   Json          // {lat, lng}
+  landmarks     Json?         // [{name, distance, walkTime}]
+  mapUrl        String?
+  
+  // Property Layout
+  bedrooms      Int           @default(1)
+  bathrooms     Decimal       @db.Decimal(3,1) @default(1)
+  beds          Int           @default(1)
+  squareMeters  Int?
+  floorNumber   Int?
+  totalFloors   Int?
+  
+  // Occupancy
+  maxGuests     Int           @default(4)
+  maxAdults     Int           @default(2)
+  maxChildren   Int           @default(0)
+  maxInfants    Int           @default(0)
+  
+  // Features (JSON for flexibility)
+  inUnitFeatures      Json?   // Kitchen, climate, entertainment, etc.
+  buildingFacilities  Json?   // Security, parking, wellness, services
+  compoundAmenities   Json?   // Retail, recreation, transport
+  nearbyServices      Json?   // Education, healthcare, shopping
+  safetyFeatures      Json?   // Smoke detector, first aid, etc.
+  familyFeatures      Json?   // Crib, high chair, toys, etc.
+  accessibilityFeatures Json? // Wheelchair access, elevator, etc.
+  workFeatures        Json?   // Desk, wifi speed, printer, etc.
+  
+  // House Rules & Info
+  houseRules          String?  @db.Text
+  checkInInstructions String?  @db.Text
+  wifiDetails         Json?    // {network, password, speed}
+  neighborhoodInfo    String?  @db.Text
+  transitInfo         String?  @db.Text
+  hostTips            String?  @db.Text
+  
+  // Check-in/out
+  checkInTime         String   @default("15:00")
+  checkOutTime        String   @default("11:00")
+  flexibleCheckIn     Boolean  @default(false)
+  selfCheckIn         Boolean  @default(false)
+  
+  // Pricing (in QAR)
+  nightlyPrice  Decimal?      @db.Decimal(10,2)
+  weeklyPrice   Decimal?      @db.Decimal(10,2)
+  monthlyPrice  Decimal       @db.Decimal(10,2)
+  
+  // Additional Fees
+  cleaningFee       Decimal?  @db.Decimal(10,2) @default(200)
+  securityDeposit   Decimal?  @db.Decimal(10,2) @default(1000)
+  extraGuestFee     Decimal?  @db.Decimal(10,2)
+  lateFeePerHour    Decimal?  @db.Decimal(10,2)
+  
+  // Discounts
+  weeklyDiscount    Int?      // Percentage
+  monthlyDiscount   Int?      // Percentage
+  earlyBirdDiscount Int?      // Percentage
+  lastMinuteDiscount Int?     // Percentage
+  
+  // Booking Settings
+  minNights         Int       @default(28)
+  maxNights         Int?      @default(365)
+  advanceNotice     Int       @default(3)    // Days
+  bookingWindow     Int       @default(365)  // Days into future
+  instantBook       Boolean   @default(false)
+  requireProfilePicture Boolean @default(false)
+  requireVerifiedPhone Boolean @default(false)
+  
+  // Cancellation Policy
+  cancellationPolicy String   @default("moderate") // flexible, moderate, strict
+  
+  // Utilities & Services
+  utilitiesIncluded Boolean   @default(false)
+  utilitiesCap      Decimal?  @db.Decimal(10,2)
+  internetIncluded  Boolean   @default(true)
+  internetSpeed     String?   // "100 Mbps"
+  parkingIncluded   Boolean   @default(true)
+  parkingType       String?   // covered, street, valet
+  
+  // Photos & Media
+  photos            Json?     // [{url, caption, order, type, roomType}]
+  virtualTourUrl    String?
+  videoUrl          String?
+  floorPlanUrl      String?
+  
+  // Quality & Category
+  tier              Tier      @default(standard)
+  isVerified        Boolean   @default(false)
+  verifiedAt        DateTime?
+  isFeatured        Boolean   @default(false)
+  featuredUntil     DateTime?
+  
+  // Stats
+  viewCount         Int       @default(0)
+  bookingCount      Int       @default(0)
+  saveCount         Int       @default(0)
+  averageRating     Float?    @default(0)
+  reviewCount       Int       @default(0)
+  
+  // SEO & Marketing
+  metaTitle         String?
+  metaDescription   String?
+  keywords          String[]
+  
+  // Status
+  isActive          Boolean   @default(false)
+  publishedAt       DateTime?
+  lastBooked        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  host              User      @relation("HostListings", fields: [hostId], references: [id])
+  bookings          Booking[]
+  reviews           Review[]
+  availability      Availability[]
+  calendarBlocks    CalendarBlock[]
+  messages          Message[]
+  favorites         FavoriteListing[]
+  priceHistory      PriceHistory[]
+  
+  @@index([city])
+  @@index([area])
+  @@index([hostId])
+  @@index([status])
+  @@index([tier])
+  @@index([slug])
+  @@index([coordinates(ops: JsonbOps)], type: Gin)
+  @@index([publishedAt])
+}
+
+model ListingDraft {
+  id          String   @id @default(cuid())
+  hostId      String
+  currentStep Int      @default(1)
+  totalSteps  Int      @default(7)
+  formData    Json     // Stores form progress
+  lastStep    Int      @default(1)
+  completed   Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  host        User     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  
+  @@index([hostId])
+  @@unique([hostId, id])
+}
+
+model Availability {
+  id          String   @id @default(cuid())
+  listingId   String
+  
+  date        DateTime @db.Date
+  available   Boolean  @default(true)
+  price       Decimal? @db.Decimal(10,2) // Override price for specific date
+  minNights   Int?     // Override min nights
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  
+  @@unique([listingId, date])
+  @@index([listingId, date])
+  @@index([available])
+}
+
+model Booking {
+  id            String        @id @default(cuid())
+  bookingCode   String        @unique @default(cuid())
+  listingId     String
+  guestId       String
+  
+  // Dates
+  checkIn       DateTime      @db.Date
+  checkOut      DateTime      @db.Date
+  
+  // Guests
+  adults        Int
+  children      Int           @default(0)
+  infants       Int           @default(0)
+  pets          Int           @default(0)
+  
+  // Pricing breakdown (in QAR)
+  nightlyRate   Decimal       @db.Decimal(10,2)
+  totalNights   Int
+  subtotal      Decimal       @db.Decimal(10,2)
+  cleaningFee   Decimal       @db.Decimal(10,2) @default(0)
+  serviceFee    Decimal       @db.Decimal(10,2) @default(0)
+  taxes         Decimal       @db.Decimal(10,2) @default(0)
+  discount      Decimal       @db.Decimal(10,2) @default(0)
+  totalPrice    Decimal       @db.Decimal(10,2)
+  
+  // Security Deposit
+  securityDeposit    Decimal? @db.Decimal(10,2)
+  depositPaid        Boolean  @default(false)
+  depositRefunded    Boolean  @default(false)
+  depositRefundedAt  DateTime?
+  
+  // Payment
+  paymentStatus PaymentStatus @default(PENDING)
+  paymentMethod String?
+  paidAt        DateTime?
+  paymentIntentId String?     // Stripe/payment gateway ID
+  
+  // Status
+  status        BookingStatus @default(PENDING)
+  confirmedAt   DateTime?
+  cancelledAt   DateTime?
+  cancelledBy   String?       // user_id
+  cancelReason  String?
+  completedAt   DateTime?
+  
+  // Check-in/out
+  actualCheckIn  DateTime?
+  actualCheckOut DateTime?
+  
+  // Guest Details
+  guestMessage  String?       @db.Text
+  specialRequests String?     @db.Text
+  arrivalTime   String?
+  guestPhone    String?
+  guestEmail    String?
+  
+  // Host Response
+  hostMessage   String?       @db.Text
+  hostNotes     String?       @db.Text // Private notes
+  
+  // Metadata
+  source        String?       // website, mobile, api
+  ip            String?
+  userAgent     String?
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  // Relations
+  listing       Listing       @relation(fields: [listingId], references: [id])
+  guest         User          @relation("GuestBookings", fields: [guestId], references: [id])
+  review        Review?
+  messages      Message[]
+  transactions  Transaction[]
+  
+  @@index([listingId, checkIn, checkOut])
+  @@index([guestId])
+  @@index([status])
+  @@index([bookingCode])
+  @@index([paymentStatus])
+}
+
+model CalendarBlock {
+  id          String   @id @default(cuid())
+  listingId   String
+  
+  startDate   DateTime @db.Date
+  endDate     DateTime @db.Date
+  reason      String?  // maintenance, personal, booked, holiday
+  note        String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  
+  @@unique([listingId, startDate, endDate])
+  @@index([listingId])
+  @@index([startDate, endDate])
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  bookingId   String   @unique
+  reviewerId  String
+  revieweeId  String
+  listingId   String
+  
+  // Ratings (1-5)
+  overall         Int
+  cleanliness     Int?
+  accuracy        Int?
+  checkIn         Int?
+  communication   Int?
+  location        Int?
+  value           Int?
+  
+  // Content
+  publicReview    String?  @db.Text
+  privateNote     String?  @db.Text // Only visible to reviewed party
+  
+  // Response
+  response        String?  @db.Text
+  respondedAt     DateTime?
+  
+  // Media
+  photos          String[]
+  
+  // Flags
+  isVerifiedStay  Boolean  @default(true)
+  isHidden        Boolean  @default(false)
+  isFlagged       Boolean  @default(false)
+  flagReason      String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  booking         Booking  @relation(fields: [bookingId], references: [id])
+  reviewer        User     @relation("UserReviews", fields: [reviewerId], references: [id])
+  reviewee        User     @relation("ReceivedReviews", fields: [revieweeId], references: [id])
+  listing         Listing  @relation(fields: [listingId], references: [id])
+  
+  @@index([listingId])
+  @@index([reviewerId])
+  @@index([revieweeId])
+  @@index([overall])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  senderId    String
+  receiverId  String?
+  listingId   String?
+  bookingId   String?
+  
+  subject     String?
+  content     String   @db.Text
+  attachments String[]
+  
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  isArchived  Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  sender      User     @relation(fields: [senderId], references: [id])
+  listing     Listing? @relation(fields: [listingId], references: [id])
+  booking     Booking? @relation(fields: [bookingId], references: [id])
+  
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([bookingId])
+  @@index([isRead])
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  bookingId   String?
+  
+  type        String   // payment, refund, payout
+  amount      Decimal  @db.Decimal(10,2)
+  currency    String   @default("QAR")
+  status      String   // success, pending, failed
+  
+  method      String   // card, bank_transfer
+  reference   String?  // External reference
+  metadata    Json?
+  
+  processedAt DateTime?
+  failedAt    DateTime?
+  failureReason String?
+  
+  createdAt   DateTime @default(now())
+  
+  booking     Booking? @relation(fields: [bookingId], references: [id])
+  
+  @@index([bookingId])
+  @@index([type])
+  @@index([status])
+}
+
+model HostPayout {
+  id          String   @id @default(cuid())
+  hostId      String
+  
+  amount      Decimal  @db.Decimal(10,2)
+  currency    String   @default("QAR")
+  
+  // Period
+  periodStart DateTime
+  periodEnd   DateTime
+  
+  // Bookings
+  bookingIds  String[] // Array of booking IDs
+  bookingsCount Int
+  
+  // Breakdown
+  earnings    Decimal  @db.Decimal(10,2)
+  serviceFee  Decimal  @db.Decimal(10,2)
+  taxes       Decimal  @db.Decimal(10,2) @default(0)
+  adjustments Decimal  @db.Decimal(10,2) @default(0)
+  
+  // Status
+  status      PayoutStatus @default(pending)
+  method      String   // bank_transfer, card
+  
+  // Processing
+  processedAt DateTime?
+  reference   String?
+  failureReason String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  host        User     @relation(fields: [hostId], references: [id])
+  
+  @@index([hostId])
+  @@index([status])
+  @@index([periodStart, periodEnd])
+}
+
+model FavoriteListing {
+  id          String   @id @default(cuid())
+  userId      String
+  listingId   String
+  
+  notes       String?
+  
+  createdAt   DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@index([listingId])
+}
+
+model SearchHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  
+  query       Json     // Store search parameters
+  resultsCount Int
+  
+  createdAt   DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  
+  type        String   // booking_confirmed, message_received, review_posted, etc.
+  title       String
+  message     String
+  data        Json?    // Additional data
+  
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  
+  createdAt   DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, isRead])
+  @@index([type])
+}
+
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  
+  token       String   @unique
+  ipAddress   String?
+  userAgent   String?
+  lastActivity DateTime @default(now())
+  expiresAt   DateTime
+  
+  createdAt   DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([token])
+}
+
+model PriceHistory {
+  id          String   @id @default(cuid())
+  listingId   String
+  
+  nightlyPrice  Decimal? @db.Decimal(10,2)
+  weeklyPrice   Decimal? @db.Decimal(10,2)
+  monthlyPrice  Decimal  @db.Decimal(10,2)
+  
+  reason      String?  // seasonal, promotion, market_adjustment
+  
+  validFrom   DateTime
+  validUntil  DateTime?
+  
+  createdAt   DateTime @default(now())
+  
+  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  
+  @@index([listingId])
+  @@index([validFrom, validUntil])
+}

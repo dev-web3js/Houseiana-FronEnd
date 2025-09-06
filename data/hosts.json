@@ -1,0 +1,22 @@
+{
+  "hosts": [
+    {
+      "id": "1757028315753",
+      "firstName": "Mohamed",
+      "lastName": "Elsayed",
+      "email": "q2easy@gmail.com",
+      "phone": "31433333",
+      "password": "$2b$10$Dscxtehq10A4ke5SsWaqGup3qbxVN4YrQvrfmlSmdc5TbFMuQk1ia",
+      "idType": "qatar_id",
+      "idNumber": "28581802956",
+      "hasProperty": "soon",
+      "propertyType": "apartment",
+      "role": "host",
+      "isVerified": false,
+      "createdAt": "2025-09-04T23:25:15.753Z",
+      "properties": [],
+      "earnings": 0,
+      "responseRate": 0
+    }
+  ]
+}
