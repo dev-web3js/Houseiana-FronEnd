@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import { hashPassword, createSession, sessionCookie } from "@/lib/auth";
 
 export async function POST(req) {
@@ -26,7 +26,7 @@ export async function POST(req) {
       });
     }
 
-    // Create user
+    // Create user - Always start as guest
     const passwordHash = await hashPassword(password);
     const user = await prisma.user.create({
       data: {
@@ -35,13 +35,15 @@ export async function POST(req) {
         firstName: firstName || null,
         lastName: lastName || null,
         name: name || `${firstName} ${lastName}`.trim() || null,
+        role: 'guest', // All new users start as guests
       },
       select: {
         id: true,
         email: true,
         firstName: true,
         lastName: true,
-        name: true
+        name: true,
+        role: true
       }
     });
 

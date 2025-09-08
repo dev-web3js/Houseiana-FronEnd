@@ -47,6 +47,10 @@ enum PropertyType {
   penthouse
   compound_villa
   room
+  duplex
+  chalet
+  farm_house
+  shared_room
 }
 
 enum ListingStatus {
@@ -72,6 +76,34 @@ enum PayoutStatus {
   completed
   failed
   cancelled
+}
+
+enum CurrencyCode {
+  QAR
+  USD
+  EUR
+  GBP
+  AED
+  SAR
+  KWD
+  BHD
+  OMR
+  EGP
+  INR
+  PKR
+  PHP
+}
+
+enum RentalType {
+  short_term  // Daily
+  mid_term    // Weekly
+  long_term   // Monthly
+}
+
+enum FurnishingStatus {
+  fully_furnished
+  semi_furnished
+  unfurnished
 }
 
 // ============ MODELS ============
@@ -161,6 +193,17 @@ model User {
   @@index([username])
 }
 
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  @@index([email])
+  @@index([token])
+}
+
 model Listing {
   id            String        @id @default(cuid())
   hostId        String
@@ -172,6 +215,8 @@ model Listing {
   description   String        @db.Text
   propertyType  PropertyType
   entirePlace   Boolean       @default(true)
+  furnishingStatus FurnishingStatus @default(fully_furnished)
+  rentalType    RentalType[]  // Can support multiple rental types
   
   // Location Details
   country       String        @default("Qatar")
@@ -179,19 +224,33 @@ model Listing {
   area          String?       // e.g., "West Bay", "The Pearl"
   district      String?       // More specific area
   
-  // Address (JSON for flexibility)
-  address       Json          // {building, street, area, zone, buildingNumber, unitNumber, postalCode}
-  coordinates   Json          // {lat, lng}
+  // Qatar National Address System
+  zoneNumber    String?       // Zone number (e.g., "24")
+  streetNumber  String?       // Street number (e.g., "230")
+  buildingNumber String?      // Building number (e.g., "15")
+  unitNumber    String?       // Unit/Flat number (e.g., "5A")
+  floorNumber   String?       // Floor number (e.g., "3")
+  
+  // Additional Address Info
+  buildingName  String?       // Building/Compound name
+  streetName    String?       // Street name if available
+  postalCode    String?       // Postal code if available
+  
+  // Location Data
+  coordinates   Json          // {lat, lng} - for map pin
+  googleMapsUrl String?       // Direct Google Maps link
   landmarks     Json?         // [{name, distance, walkTime}]
-  mapUrl        String?
+  directions    String?       @db.Text // How to reach the property
   
   // Property Layout
   bedrooms      Int           @default(1)
   bathrooms     Decimal       @db.Decimal(3,1) @default(1)
   beds          Int           @default(1)
   squareMeters  Int?
-  floorNumber   Int?
+  squareFeet    Int?          // Alternative measurement
   totalFloors   Int?
+  yearBuilt     Int?
+  lastRenovated Int?
   
   // Occupancy
   maxGuests     Int           @default(4)
@@ -223,10 +282,14 @@ model Listing {
   flexibleCheckIn     Boolean  @default(false)
   selfCheckIn         Boolean  @default(false)
   
-  // Pricing (in QAR)
+  // Pricing
+  currency      CurrencyCode  @default(QAR)
   nightlyPrice  Decimal?      @db.Decimal(10,2)
   weeklyPrice   Decimal?      @db.Decimal(10,2)
   monthlyPrice  Decimal       @db.Decimal(10,2)
+  
+  // Display prices in multiple currencies (calculated)
+  pricesInOtherCurrencies Json? // {USD: 1000, EUR: 900, etc.}
   
   // Additional Fees
   cleaningFee       Decimal?  @db.Decimal(10,2) @default(200)
@@ -455,10 +518,13 @@ model Review {
   id          String   @id @default(cuid())
   bookingId   String   @unique
   reviewerId  String
-  revieweeId  String
+  revieweeId  String?  // For host reviews (nullable for property-only reviews)
   listingId   String
   
-  // Ratings (1-5)
+  // Review Type
+  reviewType  String   // "property", "host", "guest"
+  
+  // Property Ratings (1-5) - for property and host reviews by guests
   overall         Int
   cleanliness     Int?
   accuracy        Int?
@@ -466,6 +532,17 @@ model Review {
   communication   Int?
   location        Int?
   value           Int?
+  
+  // Host-specific ratings (when reviewing host)
+  hostHospitality Int?
+  hostResponsiveness Int?
+  hostReliability Int?
+  
+  // Guest-specific ratings (1-5) - for guest reviews by hosts
+  guestCleanliness Int?
+  guestCommunication Int?
+  guestRules      Int?  // Following house rules
+  guestRecommend  Boolean? // Would recommend to other hosts
   
   // Content
   publicReview    String?  @db.Text
@@ -490,13 +567,14 @@ model Review {
   // Relations
   booking         Booking  @relation(fields: [bookingId], references: [id])
   reviewer        User     @relation("UserReviews", fields: [reviewerId], references: [id])
-  reviewee        User     @relation("ReceivedReviews", fields: [revieweeId], references: [id])
+  reviewee        User?    @relation("ReceivedReviews", fields: [revieweeId], references: [id])
   listing         Listing  @relation(fields: [listingId], references: [id])
   
   @@index([listingId])
   @@index([reviewerId])
   @@index([revieweeId])
   @@index([overall])
+  @@index([reviewType])
 }
 
 model Message {
@@ -681,4 +759,137 @@ model PriceHistory {
   
   @@index([listingId])
   @@index([validFrom, validUntil])
+}
+
+// Property Amenities Categories
+model AmenityCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique // "Kitchen", "Entertainment", "Security", etc.
+  icon        String?  // Icon name or URL
+  order       Int      @default(0)
+  
+  amenities   Amenity[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Amenity {
+  id          String   @id @default(cuid())
+  categoryId  String
+  
+  name        String   // "Air Conditioning", "WiFi", "Parking", etc.
+  description String?
+  icon        String?  // Icon name or URL
+  isPremium   Boolean  @default(false) // Premium amenities
+  
+  category    AmenityCategory @relation(fields: [categoryId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([categoryId, name])
+  @@index([categoryId])
+}
+
+// Property Rules
+model PropertyRule {
+  id          String   @id @default(cuid())
+  
+  name        String   @unique // "No Smoking", "No Pets", "No Parties"
+  description String?
+  icon        String?
+  type        String   // "restriction", "requirement", "guideline"
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Currency Exchange Rates
+model CurrencyRate {
+  id          String       @id @default(cuid())
+  
+  fromCurrency CurrencyCode
+  toCurrency   CurrencyCode
+  rate         Decimal      @db.Decimal(10,6)
+  
+  validFrom    DateTime
+  validUntil   DateTime?
+  source       String?      // "xe.com", "bank", etc.
+  
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  
+  @@unique([fromCurrency, toCurrency, validFrom])
+  @@index([fromCurrency, toCurrency])
+  @@index([validFrom, validUntil])
+}
+
+// Property Views Tracking
+model PropertyView {
+  id          String   @id @default(cuid())
+  listingId   String
+  
+  viewerId    String?  // User ID if logged in
+  sessionId   String   // Track anonymous views
+  ipAddress   String?
+  userAgent   String?
+  referrer    String?  // Where they came from
+  
+  viewDuration Int?    // Seconds spent on listing
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([listingId])
+  @@index([viewerId])
+  @@index([createdAt])
+}
+
+// Property Documents
+model PropertyDocument {
+  id          String   @id @default(cuid())
+  listingId   String
+  
+  type        String   // "ownership", "permit", "insurance", "floor_plan"
+  name        String
+  url         String   // File URL
+  size        Int?     // File size in bytes
+  mimeType    String?
+  
+  isVerified  Boolean  @default(false)
+  verifiedAt  DateTime?
+  verifiedBy  String?  // Admin user ID
+  
+  expiresAt   DateTime? // For documents that expire
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([listingId])
+  @@index([type])
+}
+
+// Property Maintenance Records
+model MaintenanceRecord {
+  id          String   @id @default(cuid())
+  listingId   String
+  
+  type        String   // "repair", "inspection", "cleaning", "upgrade"
+  title       String
+  description String?  @db.Text
+  cost        Decimal? @db.Decimal(10,2)
+  currency    CurrencyCode @default(QAR)
+  
+  performedBy String?  // Service provider name
+  performedAt DateTime
+  nextDue     DateTime?
+  
+  documents   Json?    // Array of document URLs
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([listingId])
+  @@index([type])
+  @@index([performedAt])
 }

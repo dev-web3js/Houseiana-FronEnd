@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function SignUpPage() {
   const router = useRouter();
+  const { register, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({
@@ -15,6 +17,13 @@ export default function SignUpPage() {
     password: "",
     confirmPassword: "",
   });
+
+  useEffect(() => {
+    // If already logged in, redirect to home
+    if (user) {
+      router.push('/');
+    }
+  }, [user, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,23 +46,17 @@ export default function SignUpPage() {
     setLoading(true);
     
     try {
-      const response = await fetch("/api/auth/sign-up", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-        }),
-      });
+      const success = await register(
+        formData.email,
+        formData.password,
+        formData.firstName,
+        formData.lastName
+      );
       
-      const data = await response.json();
-      
-      if (response.ok) {
-        router.push("/dashboard");
+      if (success) {
+        router.push("/");
       } else {
-        setErrors({ submit: data.error || "Sign up failed" });
+        setErrors({ submit: "Sign up failed. Email may already be in use." });
       }
     } catch (error) {
       setErrors({ submit: "Something went wrong. Please try again." });

@@ -17,6 +17,42 @@
       "properties": [],
       "earnings": 0,
       "responseRate": 0
+    },
+    {
+      "id": "1757171905530",
+      "firstName": "Mohamed",
+      "lastName": "Elsayed",
+      "email": "homosh@gmail.com",
+      "phone": "55842495",
+      "password": "$2b$10$zv5yGd52EleihJDSvkCPnuIeaumbo.WWyWKPNS5TZVIeczoRNOoGy",
+      "idType": "qatar_id",
+      "idNumber": "28581802956",
+      "hasProperty": "yes",
+      "propertyType": "apartment",
+      "role": "host",
+      "isVerified": false,
+      "createdAt": "2025-09-06T15:18:25.530Z",
+      "properties": [],
+      "earnings": 0,
+      "responseRate": 0
+    },
+    {
+      "id": "1757182188264",
+      "firstName": "Mohamed",
+      "lastName": "Elsayed",
+      "email": "dev.web3@outlook.com",
+      "phone": "55842495",
+      "password": "$2b$10$tP03XARvqB4n/bKjtynlkuNEWoKphgapGn.ZIc3CMXOMIa1s8Bj6e",
+      "idType": "passport",
+      "idNumber": "A12345",
+      "hasProperty": "soon",
+      "propertyType": "apartment",
+      "role": "host",
+      "isVerified": false,
+      "createdAt": "2025-09-06T18:09:48.264Z",
+      "properties": [],
+      "earnings": 0,
+      "responseRate": 0
     }
   ]
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -8,6 +8,17 @@ export default function BecomeAHostPage() {
   const router = useRouter();
   const [showVideo, setShowVideo] = useState(false);
   const [selectedFAQ, setSelectedFAQ] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const faqs = [
     {
@@ -55,7 +66,7 @@ export default function BecomeAHostPage() {
             Houseiana
           </Link>
           <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-            <Link href="/host/sign-in" style={{
+            <Link href="/auth/sign-in" style={{
               color: '#6b7280',
               textDecoration: 'none',
               fontSize: '14px'
@@ -63,7 +74,7 @@ export default function BecomeAHostPage() {
               Host Sign In
             </Link>
             <button
-              onClick={() => router.push('/become-a-host/signup')}
+              onClick={() => router.push('/auth/sign-up')}
               style={{
                 padding: '10px 24px',
                 backgroundColor: '#2563eb',
@@ -91,7 +102,7 @@ export default function BecomeAHostPage() {
           maxWidth: '1200px',
           margin: '0 auto',
           display: 'grid',
-          gridTemplateColumns: window.innerWidth > 768 ? '1fr 1fr' : '1fr',
+          gridTemplateColumns: !isMobile ? '1fr 1fr' : '1fr',
           gap: '60px',
           alignItems: 'center'
         }}>
@@ -113,7 +124,7 @@ export default function BecomeAHostPage() {
             </p>
             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
               <button
-                onClick={() => router.push('/become-a-host/signup')}
+                onClick={() => router.push('/auth/sign-up')}
                 style={{
                   padding: '14px 32px',
                   backgroundColor: 'white',
@@ -148,7 +159,7 @@ export default function BecomeAHostPage() {
             </div>
           </div>
           <div style={{
-            display: window.innerWidth > 768 ? 'block' : 'none',
+            display: !isMobile ? 'block' : 'none',
             position: 'relative'
           }}>
             <div style={{
@@ -531,7 +542,7 @@ export default function BecomeAHostPage() {
             Join 500+ successful hosts in Qatar today
           </p>
           <button
-            onClick={() => router.push('/become-a-host/signup')}
+            onClick={() => router.push('/auth/sign-up')}
             style={{
               padding: '16px 40px',
               backgroundColor: 'white',

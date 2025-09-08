@@ -177,9 +177,11 @@ export default function MyPropertiesPage() {
                   backgroundColor: '#f3f4f6',
                   position: 'relative'
                 }}>
-                  {property.photos && property.photos[0] ? (
+                  {property.photos && property.photos.length > 0 ? (
                     <img 
-                      src={property.photos[0]} 
+                      src={typeof property.photos[0] === 'string' 
+                        ? property.photos[0] 
+                        : property.photos[0].url || property.photos[0]} 
                       alt={property.title}
                       style={{
                         width: '100%',

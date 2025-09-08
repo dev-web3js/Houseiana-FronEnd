@@ -132,18 +132,35 @@ export default function AddPropertyPage() {
     }
   };
 
-  const handlePhotoUpload = (e) => {
+  const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
     
-    const newImages = files.map(file => ({
-      id: Date.now() + Math.random(),
-      url: URL.createObjectURL(file),
-      file: file,
-      name: file.name
-    }));
+    // Convert files to base64
+    const newImages = await Promise.all(
+      files.map(async (file) => {
+        const base64 = await convertToBase64(file);
+        return {
+          id: Date.now() + Math.random(),
+          url: URL.createObjectURL(file), // For preview
+          base64: base64, // For storage
+          file: file,
+          name: file.name
+        };
+      })
+    );
     
     setUploadedImages([...uploadedImages, ...newImages]);
     setErrors({ ...errors, photos: null });
+  };
+
+  // Helper function to convert file to base64
+  const convertToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
   };
 
   const removePhoto = (id) => {
@@ -165,7 +182,7 @@ export default function AddPropertyPage() {
       credentials: 'include',
       body: JSON.stringify({
         ...propertyData,
-        photos: uploadedImages.map(img => img.url)
+        photos: uploadedImages.map(img => img.base64) // Send base64 instead of blob URLs
       })
     });
     

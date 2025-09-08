@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function SignInPage() {
   const router = useRouter();
+  const { login, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({
@@ -13,6 +15,19 @@ export default function SignInPage() {
     password: "",
     rememberMe: false
   });
+
+  useEffect(() => {
+    // If already logged in, redirect to home or saved URL
+    if (user) {
+      const redirectUrl = localStorage.getItem('redirectAfterLogin');
+      if (redirectUrl) {
+        localStorage.removeItem('redirectAfterLogin');
+        router.push(redirectUrl);
+      } else {
+        router.push('/');
+      }
+    }
+  }, [user, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,21 +45,19 @@ export default function SignInPage() {
     setLoading(true);
     
     try {
-      const response = await fetch("/api/auth/sign-in", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
+      const success = await login(formData.email, formData.password, formData.rememberMe);
       
-      const data = await response.json();
-      
-      if (response.ok) {
-        router.push("/dashboard");
+      if (success) {
+        // Check for redirect URL
+        const redirectUrl = localStorage.getItem('redirectAfterLogin');
+        if (redirectUrl) {
+          localStorage.removeItem('redirectAfterLogin');
+          router.push(redirectUrl);
+        } else {
+          router.push("/");
+        }
       } else {
-        setErrors({ submit: data.error || "Invalid email or password" });
+        setErrors({ submit: "Invalid email or password" });
       }
     } catch (error) {
       setErrors({ submit: "Something went wrong. Please try again." });
@@ -243,54 +256,6 @@ export default function SignInPage() {
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
 
-          {/* Divider */}
-          <div style={{
-            position: 'relative',
-            marginBottom: '20px'
-          }}>
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center'
-            }}>
-              <div style={{
-                width: '100%',
-                borderTop: '1px solid #e5e7eb'
-              }}></div>
-            </div>
-            <div style={{
-              position: 'relative',
-              display: 'flex',
-              justifyContent: 'center'
-            }}>
-              <span style={{
-                backgroundColor: 'white',
-                padding: '0 16px',
-                fontSize: '12px',
-                color: '#6b7280'
-              }}>
-                OR
-              </span>
-            </div>
-          </div>
-
-          {/* Host Sign In Option */}
-          <Link href="/become-a-host/signup" style={{
-            display: 'block',
-            width: '100%',
-            padding: '12px',
-            border: '1px solid #d1d5db',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#374151',
-            textAlign: 'center',
-            textDecoration: 'none',
-            transition: 'background-color 0.2s'
-          }}>
-            Sign up as a Host
-          </Link>
         </form>
 
         {/* Sign up link */}

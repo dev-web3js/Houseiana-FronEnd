@@ -2,33 +2,52 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 
 export default function CreateBookingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [user, setUser] = useState(null);
   const [property, setProperty] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [bookingData, setBookingData] = useState({
     propertyId: searchParams.get('property'),
     checkIn: searchParams.get('checkIn'),
     checkOut: searchParams.get('checkOut'),
-    guests: 2,
+    guests: parseInt(searchParams.get('guests') || '2'),
     specialRequests: ''
   });
 
   useEffect(() => {
-    fetchPropertyDetails();
+    checkAuthAndLoadProperty();
   }, []);
 
-  const fetchPropertyDetails = async () => {
+  const checkAuthAndLoadProperty = async () => {
     try {
-      const response = await fetch(`/api/properties/${bookingData.propertyId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setProperty(data.property);
+      // Check if user is logged in
+      const authResponse = await fetch('/api/auth/me');
+      if (authResponse.ok) {
+        const userData = await authResponse.json();
+        setUser(userData);
+      } else {
+        // Save current URL to redirect back after login
+        localStorage.setItem('redirectAfterLogin', window.location.href);
+        router.push('/auth/sign-in');
+        return;
+      }
+
+      // Load property details
+      if (bookingData.propertyId) {
+        const propResponse = await fetch(`/api/properties/${bookingData.propertyId}`);
+        if (propResponse.ok) {
+          const propData = await propResponse.json();
+          setProperty(propData);
+        }
       }
     } catch (error) {
-      console.error('Error fetching property:', error);
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -40,43 +59,75 @@ export default function CreateBookingPage() {
   };
 
   const calculateTotal = () => {
-    if (!property) return 0;
+    if (!property) return { nights: 0, subtotal: 0, cleaningFee: 0, serviceFee: 0, total: 0 };
     const nights = calculateNights();
-    const monthlyRate = parseFloat(property.monthlyRent);
-    const dailyRate = monthlyRate / 30;
-    const subtotal = dailyRate * nights;
+    const nightlyPrice = parseFloat(property.nightlyPrice || property.monthlyPrice / 30);
+    const subtotal = nightlyPrice * nights;
     const cleaningFee = parseFloat(property.cleaningFee || 0);
-    return (subtotal + cleaningFee).toFixed(2);
+    const serviceFee = subtotal * 0.10; // 10% service fee
+    const total = subtotal + cleaningFee + serviceFee;
+    return { nights, nightlyPrice, subtotal, cleaningFee, serviceFee, total };
   };
 
-  const handleBooking = async () => {
-    setLoading(true);
-    
-    try {
-      const response = await fetch('/api/bookings/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          ...bookingData,
-          totalAmount: calculateTotal(),
-          status: 'confirmed'
-        })
-      });
-      
-      if (response.ok) {
-        router.push('/bookings/success');
+  const handleProceedToTerms = () => {
+    // Save booking details to session storage
+    const pricing = calculateTotal();
+    sessionStorage.setItem('bookingDetails', JSON.stringify({
+      ...bookingData,
+      pricing,
+      property: {
+        id: property.id,
+        title: property.title,
+        address: `${property.area}, ${property.city}`,
+        host: property.host
+      },
+      user: {
+        id: user.id,
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email
       }
-    } catch (error) {
-      console.error('Booking error:', error);
-    } finally {
-      setLoading(false);
-    }
+    }));
+    router.push('/booking/terms');
   };
+
+  if (loading) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center' 
+      }}>
+        <div>Loading booking details...</div>
+      </div>
+    );
+  }
 
   if (!property) {
-    return <div>Loading...</div>;
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        flexDirection: 'column',
+        gap: '20px'
+      }}>
+        <div>Property not found</div>
+        <Link href="/search" style={{
+          padding: '12px 24px',
+          backgroundColor: '#2563eb',
+          color: 'white',
+          borderRadius: '8px',
+          textDecoration: 'none'
+        }}>
+          Back to Search
+        </Link>
+      </div>
+    );
   }
+
+  const pricing = calculateTotal();
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
@@ -97,12 +148,31 @@ export default function CreateBookingPage() {
               <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px' }}>
                 Property Details
               </h2>
-              <h3 style={{ fontSize: '18px', fontWeight: '500', marginBottom: '8px' }}>
-                {property.title}
-              </h3>
-              <p style={{ color: '#6b7280', marginBottom: '16px' }}>
-                {property.area}, {property.city}
-              </p>
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <div style={{
+                  width: '120px',
+                  height: '90px',
+                  backgroundColor: '#f3f4f6',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '32px'
+                }}>
+                  🏠
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '500', marginBottom: '8px' }}>
+                    {property.title}
+                  </h3>
+                  <p style={{ color: '#6b7280', marginBottom: '8px' }}>
+                    {property.area}, {property.city}
+                  </p>
+                  <p style={{ fontSize: '14px', color: '#6b7280' }}>
+                    {property.bedrooms} BR • {property.bathrooms} BA • {property.maxGuests} Guests
+                  </p>
+                </div>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
                   <p style={{ fontSize: '14px', color: '#6b7280' }}>Check-in</p>
@@ -163,15 +233,19 @@ export default function CreateBookingPage() {
               
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span>QAR {(property.monthlyRent / 30).toFixed(2)} × {calculateNights()} nights</span>
-                  <span>QAR {((property.monthlyRent / 30) * calculateNights()).toFixed(2)}</span>
+                  <span>QAR {pricing.nightlyPrice?.toFixed(2)} × {pricing.nights} nights</span>
+                  <span>QAR {pricing.subtotal?.toFixed(2)}</span>
                 </div>
-                {property.cleaningFee && (
+                {pricing.cleaningFee > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <span>Cleaning fee</span>
-                    <span>QAR {property.cleaningFee}</span>
+                    <span>QAR {pricing.cleaningFee?.toFixed(2)}</span>
                   </div>
                 )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span>Service fee</span>
+                  <span>QAR {pricing.serviceFee?.toFixed(2)}</span>
+                </div>
                 <div style={{
                   borderTop: '1px solid #e5e7eb',
                   paddingTop: '12px',
@@ -181,27 +255,26 @@ export default function CreateBookingPage() {
                   fontWeight: '600',
                   fontSize: '18px'
                 }}>
-                  <span>Total</span>
-                  <span>QAR {calculateTotal()}</span>
+                  <span>Total (QAR)</span>
+                  <span>QAR {pricing.total?.toFixed(2)}</span>
                 </div>
               </div>
 
               <button
-                onClick={handleBooking}
-                disabled={loading}
+                onClick={handleProceedToTerms}
                 style={{
                   width: '100%',
                   padding: '14px',
-                  backgroundColor: loading ? '#9ca3af' : '#2563eb',
+                  backgroundColor: '#2563eb',
                   color: 'white',
                   borderRadius: '8px',
                   fontSize: '16px',
                   fontWeight: '600',
                   border: 'none',
-                  cursor: loading ? 'not-allowed' : 'pointer'
+                  cursor: 'pointer'
                 }}
               >
-                {loading ? 'Processing...' : 'Confirm Booking'}
+                Continue to Terms & Conditions
               </button>
 
               <p style={{
@@ -210,8 +283,25 @@ export default function CreateBookingPage() {
                 marginTop: '12px',
                 textAlign: 'center'
               }}>
-                By booking, you agree to our terms and conditions
+                You won't be charged yet
               </p>
+
+              {/* Guest Info */}
+              <div style={{
+                padding: '12px',
+                backgroundColor: '#fef3c7',
+                borderRadius: '8px',
+                marginTop: '16px',
+                fontSize: '14px'
+              }}>
+                <p style={{ fontWeight: '600', marginBottom: '4px' }}>
+                  Booking for:
+                </p>
+                <p>{user?.firstName} {user?.lastName}</p>
+                <p style={{ color: '#92400e', fontSize: '13px' }}>
+                  {user?.email}
+                </p>
+              </div>
             </div>
           </div>
         </div>

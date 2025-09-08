@@ -1,121 +1,265 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
+import crypto from 'crypto';
 
-export async function POST(request) {
+export async function GET() {
   try {
-    // Get session from cookie
+    // Verify authentication
     const cookieStore = await cookies();
     const sessionToken = cookieStore.get('houseiana_session');
     
-    if (!sessionToken || !sessionToken.value) {
-      console.log('No session token found');
-      return NextResponse.json({ error: 'Please sign in to continue' }, { status: 401 });
+    if (!sessionToken?.value) {
+      return NextResponse.json(
+        { error: 'Please sign in' },
+        { status: 401 }
+      );
     }
 
-    // For now, decode the base64 session (if not using database sessions yet)
-    let userId;
+    // Get user from session
+    let user;
     try {
-      const sessionData = JSON.parse(
-        Buffer.from(sessionToken.value, 'base64').toString()
-      );
-      userId = sessionData.id;
-      console.log('Session user ID:', userId);
-    } catch (e) {
-      // If using database sessions
       const session = await prisma.session.findUnique({
-        where: { token: sessionToken.value }
+        where: { token: sessionToken.value },
+        include: { user: true }
       });
       
-      if (!session || session.expiresAt < new Date()) {
-        return NextResponse.json({ error: 'Session expired' }, { status: 401 });
+      if (session && session.expiresAt > new Date()) {
+        user = session.user;
+      } else {
+        // Fallback
+        const sessionData = JSON.parse(
+          Buffer.from(sessionToken.value, 'base64').toString()
+        );
+        user = await prisma.user.findUnique({
+          where: { email: sessionData.email }
+        });
       }
-      
-      userId = session.userId;
+    } catch (e) {
+      return NextResponse.json(
+        { error: 'Invalid session' },
+        { status: 401 }
+      );
     }
 
-    const data = await request.json();
-    console.log('Creating property for user:', userId);
-    
-    // Create property in database
-    const property = await prisma.listing.create({
-      data: {
-        hostId: userId,
-        title: data.title,
-        description: data.description || '',
-        propertyType: data.propertyType.toLowerCase(),
-        bedrooms: parseInt(data.bedrooms),
-        bathrooms: parseFloat(data.bathrooms),
-        maxGuests: parseInt(data.maxGuests),
-        squareMeters: data.size ? parseInt(data.size) : null,
-        
-        // Location
-        city: data.city,
-        area: data.area,
-        address: {
-          street: data.address,
-          building: data.buildingName || '',
-          floor: data.floorNumber || ''
-        },
-        
-        // Pricing
-        monthlyPrice: parseFloat(data.monthlyRent),
-        weeklyPrice: data.weeklyRent ? parseFloat(data.weeklyRent) : null,
-        nightlyPrice: data.dailyRent ? parseFloat(data.dailyRent) : null,
-        cleaningFee: data.cleaningFee ? parseFloat(data.cleaningFee) : 200,
-        securityDeposit: data.securityDeposit ? parseFloat(data.securityDeposit) : 1000,
-        
-        // Features
-        inUnitFeatures: data.amenities || {},
-        photos: data.photos || [],
-        
-        // Rules and settings
-        houseRules: data.houseRules || '',
-        minNights: parseInt(data.minimumStay || 30),
-        instantBook: data.instantBooking || false,
-        checkInTime: data.checkInTime || '15:00',
-        checkOutTime: data.checkOutTime || '11:00',
-        
-        // Status
-        status: 'active',
-        isActive: true,
-        publishedAt: new Date()
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 401 }
+      );
+    }
+
+    // Fetch properties from database
+    const properties = await prisma.listing.findMany({
+      where: {
+        hostId: user.id,
+        status: {
+          not: 'deleted'
+        }
+      },
+      include: {
+        _count: {
+          select: {
+            bookings: true,
+            reviews: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
       }
     });
 
-    console.log('Property created successfully:', property.id);
+    // Transform the data
+    const transformedProperties = properties.map(property => ({
+      ...property,
+      bookingCount: property._count.bookings,
+      reviewCount: property._count.reviews,
+      monthlyRent: property.monthlyPrice, // For backward compatibility
+    }));
 
-    // Create availability calendar
-    const availabilityData = [];
-    const today = new Date();
+    return NextResponse.json({
+      properties: transformedProperties,
+      total: properties.length,
+      hostId: user.id
+    });
     
-    for (let i = 0; i < 365; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
+  } catch (error) {
+    console.error('Error fetching properties:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch properties' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request) {
+  try {
+    // Verify authentication
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get('houseiana_session');
+    
+    if (!sessionToken?.value) {
+      return NextResponse.json(
+        { error: 'Please sign in', success: false },
+        { status: 401 }
+      );
+    }
+
+    // Get user from session
+    let user;
+    try {
+      const session = await prisma.session.findUnique({
+        where: { token: sessionToken.value },
+        include: { user: true }
+      });
       
-      availabilityData.push({
-        listingId: property.id,
-        date: date,
-        available: true
+      if (session && session.expiresAt > new Date()) {
+        user = session.user;
+      } else {
+        // Fallback
+        const sessionData = JSON.parse(
+          Buffer.from(sessionToken.value, 'base64').toString()
+        );
+        user = await prisma.user.findUnique({
+          where: { email: sessionData.email }
+        });
+      }
+    } catch (e) {
+      return NextResponse.json(
+        { error: 'Invalid session', success: false },
+        { status: 401 }
+      );
+    }
+
+    // Check if user exists
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found', success: false },
+        { status: 401 }
+      );
+    }
+
+    // Log for debugging
+    console.log('User creating property:', {
+      id: user.id,
+      email: user.email,
+      isHost: user.isHost,
+      role: user.role
+    });
+
+    // Check if user is a host (check both isHost flag and role)
+    if (!user.isHost && user.role !== 'host' && user.role !== 'both') {
+      // If not a host, update them to be a host
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { 
+          isHost: true,
+          role: user.role === 'guest' ? 'host' : 'both',
+          hostSince: new Date()
+        }
+      });
+      
+      // Refresh user data
+      user = await prisma.user.findUnique({
+        where: { id: user.id }
       });
     }
+
+    // Parse request body
+    const body = await request.json();
     
-    await prisma.availability.createMany({
-      data: availabilityData,
-      skipDuplicates: true
+    // Generate slug from title
+    const slug = body.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') + 
+      '-' + crypto.randomBytes(4).toString('hex');
+
+    // Create the listing
+    const newListing = await prisma.listing.create({
+      data: {
+        hostId: user.id,
+        status: 'active',
+        
+        // Basic Info
+        title: body.title,
+        slug: slug,
+        description: body.description || '',
+        propertyType: body.propertyType || 'apartment',
+        entirePlace: true,
+        
+        // Location
+        country: 'Qatar',
+        city: body.city || 'Doha',
+        area: body.area || '',
+        district: body.area || '',
+        buildingName: body.buildingName || '',
+        streetNumber: body.address || '',
+        floorNumber: body.floorNumber || '',
+        
+        // Coordinates (required field - default to Doha center if not provided)
+        coordinates: body.coordinates || { lat: 25.2854, lng: 51.5310 },
+        
+        // Property Layout
+        bedrooms: parseInt(body.bedrooms) || 1,
+        bathrooms: parseFloat(body.bathrooms) || 1,
+        beds: parseInt(body.bedrooms) || 1,
+        squareMeters: body.size ? parseInt(body.size) : null,
+        
+        // Occupancy
+        maxGuests: parseInt(body.maxGuests) || 2,
+        maxAdults: parseInt(body.maxGuests) || 2,
+        
+        // Pricing
+        monthlyPrice: parseFloat(body.monthlyRent) || 0,
+        weeklyPrice: body.weeklyRent ? parseFloat(body.weeklyRent) : null,
+        nightlyPrice: body.dailyRent ? parseFloat(body.dailyRent) : null,
+        cleaningFee: body.cleaningFee ? parseFloat(body.cleaningFee) : 200,
+        securityDeposit: body.securityDeposit ? parseFloat(body.securityDeposit) : 1000,
+        
+        // Check-in/out
+        checkInTime: body.checkInTime || '15:00',
+        checkOutTime: body.checkOutTime || '11:00',
+        
+        // Booking Settings
+        minNights: parseInt(body.minimumStay) || 30,
+        instantBook: body.instantBooking || false,
+        
+        // Features (store amenities as JSON)
+        inUnitFeatures: body.amenities || {},
+        
+        // Photos
+        photos: body.photos ? body.photos.map((url, index) => ({
+          url,
+          order: index,
+          caption: ''
+        })) : [],
+        
+        // House Rules
+        houseRules: body.houseRules || '',
+        
+        // Availability
+        isActive: true,
+        publishedAt: new Date(),
+        
+        // SEO
+        keywords: [body.propertyType, body.city, body.area].filter(Boolean)
+      }
     });
 
     return NextResponse.json({
       success: true,
-      property,
-      message: 'Property published successfully!'
+      message: 'Property published successfully!',
+      property: newListing
     });
-    
+
   } catch (error) {
     console.error('Error creating property:', error);
     return NextResponse.json(
       { 
-        error: 'Failed to publish property', 
+        error: 'Failed to create property', 
+        success: false,
         details: error.message 
       },
       { status: 500 }
