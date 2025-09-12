@@ -9,7 +9,9 @@
     "start": "next start",
     "lint": "eslint",
     "export": "set EXPORT_STATIC=true && next build",
-    "build:static": "set EXPORT_STATIC=true && next build"
+    "build:static": "set EXPORT_STATIC=true && next build",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

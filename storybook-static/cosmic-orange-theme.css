@@ -1,0 +1,221 @@
+/* Cosmic Orange Theme for Storybook */
+
+:root {
+  /* Cosmic Orange Color Palette */
+  --cosmic-orange-primary: #FF6B35;
+  --cosmic-orange-secondary: #F7931E;
+  --cosmic-orange-light: #FFB896;
+  --cosmic-orange-bg: #FFF8F5;
+  --cosmic-orange-surface: #FFF0EB;
+  --cosmic-orange-text: #2D1B12;
+  --cosmic-orange-text-muted: #8B5A3C;
+}
+
+/* Override Storybook manager theme */
+.sidebar-container {
+  background: var(--cosmic-orange-bg) !important;
+}
+
+.sidebar-header {
+  background: var(--cosmic-orange-surface) !important;
+  border-bottom: 1px solid var(--cosmic-orange-light) !important;
+}
+
+.sidebar-item[data-selected="true"] {
+  background: var(--cosmic-orange-primary) !important;
+  color: white !important;
+}
+
+.sidebar-item:hover {
+  background: var(--cosmic-orange-surface) !important;
+  color: var(--cosmic-orange-text) !important;
+}
+
+/* Toolbar styling */
+.toolbar {
+  background: var(--cosmic-orange-surface) !important;
+  border-bottom: 1px solid var(--cosmic-orange-light) !important;
+}
+
+.toolbar button {
+  color: var(--cosmic-orange-text) !important;
+}
+
+.toolbar button:hover {
+  background: var(--cosmic-orange-light) !important;
+}
+
+.toolbar button[data-selected="true"] {
+  background: var(--cosmic-orange-primary) !important;
+  color: white !important;
+}
+
+/* Panel styling */
+.panel-container {
+  background: white !important;
+  border-top: 1px solid var(--cosmic-orange-light) !important;
+}
+
+/* Controls panel */
+.docblock-argstable table {
+  border: 1px solid var(--cosmic-orange-light) !important;
+}
+
+.docblock-argstable th {
+  background: var(--cosmic-orange-surface) !important;
+  color: var(--cosmic-orange-text) !important;
+}
+
+/* Buttons */
+button[role="tab"][aria-selected="true"] {
+  background: var(--cosmic-orange-primary) !important;
+  color: white !important;
+  border-color: var(--cosmic-orange-primary) !important;
+}
+
+button[role="tab"]:hover {
+  background: var(--cosmic-orange-surface) !important;
+  color: var(--cosmic-orange-text) !important;
+}
+
+/* Canvas background options */
+.css-1wa3eu0-placeholder {
+  background: var(--cosmic-orange-bg) !important;
+}
+
+/* Brand styling */
+.sidebar-header .brand {
+  color: var(--cosmic-orange-text) !important;
+  font-weight: 700 !important;
+}
+
+.sidebar-header .brand::before {
+  content: "🏠 ";
+  margin-right: 8px;
+}
+
+/* Search input */
+.search-field input {
+  background: white !important;
+  border: 1px solid var(--cosmic-orange-light) !important;
+  color: var(--cosmic-orange-text) !important;
+}
+
+.search-field input:focus {
+  border-color: var(--cosmic-orange-primary) !important;
+  box-shadow: 0 0 0 1px var(--cosmic-orange-primary) !important;
+}
+
+/* Story canvas */
+.sb-show-main {
+  background: var(--cosmic-orange-bg) !important;
+}
+
+/* Documentation styles */
+.sbdocs-content {
+  color: var(--cosmic-orange-text) !important;
+}
+
+.sbdocs-h1 {
+  color: var(--cosmic-orange-primary) !important;
+  border-bottom: 2px solid var(--cosmic-orange-light) !important;
+}
+
+.sbdocs-h2 {
+  color: var(--cosmic-orange-secondary) !important;
+}
+
+/* Code blocks */
+.prismjs {
+  background: var(--cosmic-orange-surface) !important;
+  border: 1px solid var(--cosmic-orange-light) !important;
+}
+
+/* Links */
+.sbdocs-content a {
+  color: var(--cosmic-orange-primary) !important;
+}
+
+.sbdocs-content a:hover {
+  color: var(--cosmic-orange-secondary) !important;
+}
+
+/* Tables */
+.sbdocs-content table {
+  border: 1px solid var(--cosmic-orange-light) !important;
+}
+
+.sbdocs-content th {
+  background: var(--cosmic-orange-surface) !important;
+  color: var(--cosmic-orange-text) !important;
+}
+
+.sbdocs-content tr:hover {
+  background: var(--cosmic-orange-bg) !important;
+}
+
+/* Loading animation with cosmic orange */
+.sb-preparing-story {
+  background: linear-gradient(45deg, var(--cosmic-orange-primary), var(--cosmic-orange-secondary)) !important;
+}
+
+/* Status indicators */
+.sidebar-item[data-type="story"][data-status="warn"]::after {
+  background: var(--cosmic-orange-secondary) !important;
+}
+
+.sidebar-item[data-type="story"][data-status="error"]::after {
+  background: #FF4444 !important;
+}
+
+.sidebar-item[data-type="story"][data-status="success"]::after {
+  background: var(--cosmic-orange-primary) !important;
+}
+
+/* Control inputs */
+input[type="text"], 
+input[type="number"], 
+textarea, 
+select {
+  border: 1px solid var(--cosmic-orange-light) !important;
+  background: white !important;
+  color: var(--cosmic-orange-text) !important;
+}
+
+input[type="text"]:focus, 
+input[type="number"]:focus, 
+textarea:focus, 
+select:focus {
+  border-color: var(--cosmic-orange-primary) !important;
+  box-shadow: 0 0 0 1px var(--cosmic-orange-primary) !important;
+}
+
+/* Checkboxes and radio buttons */
+input[type="checkbox"], 
+input[type="radio"] {
+  accent-color: var(--cosmic-orange-primary) !important;
+}
+
+/* Range sliders */
+input[type="range"] {
+  accent-color: var(--cosmic-orange-primary) !important;
+}
+
+/* Color pickers */
+input[type="color"] {
+  border: 2px solid var(--cosmic-orange-light) !important;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar-track {
+  background: var(--cosmic-orange-bg) !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cosmic-orange-light) !important;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cosmic-orange-primary) !important;
+}
