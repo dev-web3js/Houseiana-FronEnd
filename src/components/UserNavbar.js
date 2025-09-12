@@ -3,12 +3,14 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function UserNavbar({ user }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showHostMenu, setShowHostMenu] = useState(false);
   const menuRef = useRef(null);
   const router = useRouter();
+  const { logout } = useAuth();
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -23,9 +25,7 @@ export default function UserNavbar({ user }) {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    router.push('/');
+    logout();
     setIsOpen(false);
   };
 
@@ -84,14 +84,14 @@ export default function UserNavbar({ user }) {
       items: [
         { 
           label: 'Become a host', 
-          href: '/become-host', 
+          href: '/become-a-host', 
           icon: '🏠',
           highlight: true,
           description: 'Start earning today'
         },
         { 
           label: 'Host dashboard', 
-          href: '/host/dashboard', 
+          href: '/dashboard', 
           icon: '📊',
           description: 'Manage your listings',
           requiresHost: true

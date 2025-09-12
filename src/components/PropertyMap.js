@@ -1,277 +1,318 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
+import { useEffect, useRef, useState } from "react";
 
-// Dynamically import Leaflet components to avoid SSR issues
-const MapContainer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.MapContainer),
-  { ssr: false }
-);
+export default function PropertyMap({ 
+  properties = [], 
+  selectedProperty, 
+  onPropertySelect, 
+  center = { lat: 25.2854, lng: 51.5310 } 
+}) {
+  const mapRef = useRef(null);
+  const googleMapRef = useRef(null);
+  const markersRef = useRef([]);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
-const TileLayer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.TileLayer),
-  { ssr: false }
-);
-
-const Marker = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Marker),
-  { ssr: false }
-);
-
-const Popup = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Popup),
-  { ssr: false }
-);
-
-export default function PropertyMap({ location, coordinates, title }) {
-  const [isClient, setIsClient] = useState(false);
-  const [L, setL] = useState(null);
+  const formatPrice = (price) => {
+    if (price >= 1000) {
+      return `QAR ${Math.round(price / 1000)}k`;
+    }
+    return `QAR ${price}`;
+  };
 
   useEffect(() => {
-    setIsClient(true);
-    // Import Leaflet and set icon
-    import('leaflet').then((leaflet) => {
-      setL(leaflet.default);
-      // Fix default marker icon issue
-      delete leaflet.default.Icon.Default.prototype._getIconUrl;
-      leaflet.default.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      });
-    });
-  }, []);
+    // Load Google Maps API
+    const loadGoogleMaps = () => {
+      if (window.google && window.google.maps) {
+        initializeMap();
+        return;
+      }
 
-  if (!isClient || !L || !coordinates) {
+      const script = document.createElement("script");
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY'}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = initializeMap;
+      script.onerror = () => {
+        console.warn('Google Maps API failed to load, using fallback');
+        setMapLoaded(true); // Set to true to show fallback
+      };
+      document.head.appendChild(script);
+    };
+
+    const initializeMap = () => {
+      if (!mapRef.current) return;
+
+      const map = new window.google.maps.Map(mapRef.current, {
+        center: center,
+        zoom: 11,
+        styles: [
+          {
+            "featureType": "poi",
+            "elementType": "labels",
+            "stylers": [{ "visibility": "off" }]
+          },
+          {
+            "featureType": "transit",
+            "elementType": "labels",
+            "stylers": [{ "visibility": "off" }]
+          }
+        ],
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        zoomControlOptions: {
+          position: window.google.maps.ControlPosition.RIGHT_BOTTOM
+        }
+      });
+
+      googleMapRef.current = map;
+      setMapLoaded(true);
+    };
+
+    loadGoogleMaps();
+  }, [center]);
+
+  useEffect(() => {
+    if (!mapLoaded || !googleMapRef.current || !window.google) return;
+
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current = [];
+
+    // Create markers for each property
+    properties.forEach((property) => {
+      if (!property.coordinates) return;
+
+      // Create custom marker with price overlay
+      const markerDiv = document.createElement('div');
+      markerDiv.style.cssText = `
+        background: ${selectedProperty?.id === property.id ? '#222' : 'white'};
+        color: ${selectedProperty?.id === property.id ? 'white' : '#222'};
+        border: 2px solid ${selectedProperty?.id === property.id ? '#222' : '#ddd'};
+        border-radius: 20px;
+        padding: 6px 12px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        transition: all 0.2s ease;
+        white-space: nowrap;
+        position: relative;
+        z-index: ${selectedProperty?.id === property.id ? 1000 : 1};
+      `;
+      markerDiv.textContent = formatPrice(property.monthlyPrice);
+
+      // Add hover effects
+      markerDiv.addEventListener('mouseenter', () => {
+        if (selectedProperty?.id !== property.id) {
+          markerDiv.style.background = '#222';
+          markerDiv.style.color = 'white';
+          markerDiv.style.transform = 'scale(1.1)';
+          markerDiv.style.zIndex = '999';
+        }
+      });
+
+      markerDiv.addEventListener('mouseleave', () => {
+        if (selectedProperty?.id !== property.id) {
+          markerDiv.style.background = 'white';
+          markerDiv.style.color = '#222';
+          markerDiv.style.transform = 'scale(1)';
+          markerDiv.style.zIndex = '1';
+        }
+      });
+
+      markerDiv.addEventListener('click', () => {
+        onPropertySelect?.(property);
+      });
+
+      const marker = new window.google.maps.OverlayView();
+      
+      marker.onAdd = function() {
+        const panes = this.getPanes();
+        panes.overlayMouseTarget.appendChild(markerDiv);
+      };
+
+      marker.draw = function() {
+        const projection = this.getProjection();
+        const position = projection.fromLatLngToDivPixel(
+          new window.google.maps.LatLng(property.coordinates.lat, property.coordinates.lng)
+        );
+        
+        markerDiv.style.left = (position.x - markerDiv.offsetWidth / 2) + 'px';
+        markerDiv.style.top = (position.y - markerDiv.offsetHeight / 2) + 'px';
+        markerDiv.style.position = 'absolute';
+      };
+
+      marker.onRemove = function() {
+        if (markerDiv.parentNode) {
+          markerDiv.parentNode.removeChild(markerDiv);
+        }
+      };
+
+      marker.setMap(googleMapRef.current);
+      markersRef.current.push(marker);
+    });
+
+    // Adjust map bounds to fit all properties
+    if (properties.length > 0) {
+      const bounds = new window.google.maps.LatLngBounds();
+      properties.forEach(property => {
+        if (property.coordinates) {
+          bounds.extend(new window.google.maps.LatLng(
+            property.coordinates.lat, 
+            property.coordinates.lng
+          ));
+        }
+      });
+      googleMapRef.current.fitBounds(bounds);
+      
+      // Ensure minimum zoom level
+      const listener = window.google.maps.event.addListener(googleMapRef.current, "idle", function() {
+        if (googleMapRef.current.getZoom() > 15) {
+          googleMapRef.current.setZoom(15);
+        }
+        window.google.maps.event.removeListener(listener);
+      });
+    }
+  }, [properties, selectedProperty, mapLoaded, onPropertySelect]);
+
+  // Show fallback when Google Maps is not available
+  if (!window.google && mapLoaded) {
     return (
       <div style={{
-        width: '100%',
-        height: '400px',
-        backgroundColor: '#f0f0f0',
-        borderRadius: '12px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#666'
+        height: "100%",
+        backgroundColor: "#f5f5f5",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#666",
+        fontSize: "16px",
+        flexDirection: "column",
+        padding: "20px",
+        textAlign: "center"
       }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '10px' }}>📍</div>
-          <div>Loading map...</div>
+        <div style={{ fontSize: "48px", marginBottom: "16px" }}>🗺️</div>
+        <div style={{ marginBottom: "8px" }}>Map temporarily unavailable</div>
+        <div style={{ fontSize: "14px", color: "#999" }}>
+          Showing {properties.length} properties in the area
         </div>
       </div>
     );
   }
 
-  const position = [coordinates.lat, coordinates.lng];
+  if (!mapLoaded) {
+    return (
+      <div style={{
+        height: "100%",
+        backgroundColor: "#f5f5f5",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#666",
+        fontSize: "16px"
+      }}>
+        Loading map...
+      </div>
+    );
+  }
 
   return (
-    <>
-      {/* Import Leaflet CSS */}
-      <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-        crossOrigin=""
-      />
+    <div style={{ height: "100%", position: "relative" }}>
+      <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
       
-      <div style={{ position: 'relative' }}>
-        <MapContainer 
-          center={position} 
-          zoom={15} 
-          style={{ 
-            height: '480px', 
-            width: '100%',
-            borderRadius: '12px',
-            zIndex: 1
+      {/* Map Controls */}
+      <div style={{
+        position: "absolute",
+        top: "16px",
+        left: "16px",
+        display: "flex",
+        gap: "8px"
+      }}>
+        <button
+          onClick={() => {
+            if (googleMapRef.current && properties.length > 0) {
+              const bounds = new window.google.maps.LatLngBounds();
+              properties.forEach(property => {
+                if (property.coordinates) {
+                  bounds.extend(new window.google.maps.LatLng(
+                    property.coordinates.lat, 
+                    property.coordinates.lng
+                  ));
+                }
+              });
+              googleMapRef.current.fitBounds(bounds);
+            }
           }}
-          scrollWheelZoom={false}
+          style={{
+            padding: "8px 12px",
+            backgroundColor: "white",
+            border: "1px solid #ddd",
+            borderRadius: "8px",
+            fontSize: "14px",
+            cursor: "pointer",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+          }}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <Marker position={position}>
-            <Popup>
-              <div style={{ textAlign: 'center' }}>
-                <strong>{title}</strong>
-                <br />
-                {location.area}, {location.city}
-              </div>
-            </Popup>
-          </Marker>
-        </MapContainer>
-
-        {/* Map overlay with location info */}
-        <div style={{
-          position: 'absolute',
-          bottom: '20px',
-          left: '20px',
-          backgroundColor: 'white',
-          padding: '16px 20px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          zIndex: 1000,
-          maxWidth: '300px'
-        }}>
-          <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>
-            Exact location provided after booking
-          </div>
-          <div style={{ fontSize: '13px', color: '#666' }}>
-            {location.area}, {location.city}, {location.country}
-          </div>
-        </div>
-
-        {/* Neighborhood highlights */}
-        <div style={{
-          position: 'absolute',
-          top: '20px',
-          right: '20px',
-          backgroundColor: 'white',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          zIndex: 1000
-        }}>
-          <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
-            Neighborhood
-          </div>
-          <div style={{ display: 'flex', gap: '12px', fontSize: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span>🚶</span>
-              <span>Walkable</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span>🛒</span>
-              <span>Shopping</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span>🍽️</span>
-              <span>Dining</span>
-            </div>
-          </div>
-        </div>
+          Fit all properties
+        </button>
       </div>
 
-      {/* What's nearby section */}
-      <div style={{ marginTop: '32px' }}>
-        <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '20px' }}>
-          What's nearby
-        </h3>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px'
-        }}>
-          {getNearbyPlaces(location.area).map((place, index) => (
-            <div key={index} style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px',
-              backgroundColor: '#f7f7f7',
-              borderRadius: '8px'
-            }}>
-              <span style={{ fontSize: '20px' }}>{place.icon}</span>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: '500' }}>{place.name}</div>
-                <div style={{ fontSize: '12px', color: '#666' }}>{place.distance}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* Property Count */}
+      <div style={{
+        position: "absolute",
+        bottom: "16px",
+        left: "16px",
+        padding: "8px 12px",
+        backgroundColor: "white",
+        border: "1px solid #ddd",
+        borderRadius: "8px",
+        fontSize: "14px",
+        fontWeight: "500",
+        boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+      }}>
+        {properties.length} properties
       </div>
 
-      {/* Getting around section */}
-      <div style={{ marginTop: '32px' }}>
-        <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '20px' }}>
-          Getting around
-        </h3>
+      {/* Selected Property Info */}
+      {selectedProperty && (
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: '16px'
+          position: "absolute",
+          bottom: "16px",
+          right: "16px",
+          padding: "12px",
+          backgroundColor: "white",
+          border: "1px solid #ddd",
+          borderRadius: "12px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          maxWidth: "200px"
         }}>
           <div style={{
-            padding: '16px',
-            border: '1px solid #e0e0e0',
-            borderRadius: '8px'
+            fontSize: "14px",
+            fontWeight: "600",
+            marginBottom: "4px",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap"
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <span style={{ fontSize: '20px' }}>🚗</span>
-              <span style={{ fontWeight: '500' }}>By Car</span>
-            </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>
-              Free parking available on premises. Easy access to major highways.
-            </div>
+            {selectedProperty.title}
           </div>
           <div style={{
-            padding: '16px',
-            border: '1px solid #e0e0e0',
-            borderRadius: '8px'
+            fontSize: "12px",
+            color: "#717171",
+            marginBottom: "4px"
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <span style={{ fontSize: '20px' }}>🚌</span>
-              <span style={{ fontWeight: '500' }}>Public Transport</span>
-            </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>
-              Bus stops within walking distance. Metro station nearby.
-            </div>
+            {selectedProperty.area}, {selectedProperty.city}
           </div>
           <div style={{
-            padding: '16px',
-            border: '1px solid #e0e0e0',
-            borderRadius: '8px'
+            fontSize: "14px",
+            fontWeight: "600",
+            color: "#FF385C"
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <span style={{ fontSize: '20px' }}>✈️</span>
-              <span style={{ fontWeight: '500' }}>Airport</span>
-            </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>
-              Hamad International Airport - 20-30 min drive
-            </div>
+            {formatPrice(selectedProperty.monthlyPrice)}/month
           </div>
         </div>
-      </div>
-    </>
+      )}
+    </div>
   );
-}
-
-// Helper function to get nearby places based on area
-function getNearbyPlaces(area) {
-  const places = {
-    'The Pearl': [
-      { icon: '🏖️', name: 'Pearl Beach', distance: '5 min walk' },
-      { icon: '🛍️', name: 'Porto Arabia', distance: '3 min walk' },
-      { icon: '🍽️', name: 'Medina Centrale', distance: '7 min walk' },
-      { icon: '☕', name: 'Starbucks', distance: '2 min walk' },
-      { icon: '🏪', name: 'Carrefour Market', distance: '5 min walk' },
-      { icon: '🏊', name: 'Beach Club', distance: '10 min walk' }
-    ],
-    'West Bay': [
-      { icon: '🏢', name: 'Business District', distance: '5 min walk' },
-      { icon: '🛍️', name: 'City Center Mall', distance: '10 min walk' },
-      { icon: '🏖️', name: 'Corniche Beach', distance: '15 min walk' },
-      { icon: '🍽️', name: 'Restaurant District', distance: '5 min walk' },
-      { icon: '☕', name: 'Coffee Shops', distance: '3 min walk' },
-      { icon: '🚇', name: 'Metro Station', distance: '8 min walk' }
-    ],
-    'Al Waab': [
-      { icon: '🛍️', name: 'Villagio Mall', distance: '10 min drive' },
-      { icon: '🏫', name: 'American School', distance: '5 min drive' },
-      { icon: '⛳', name: 'Aspire Park', distance: '7 min drive' },
-      { icon: '🏪', name: 'Al Meera Supermarket', distance: '3 min drive' },
-      { icon: '🍽️', name: 'Local Restaurants', distance: '5 min drive' },
-      { icon: '🏥', name: 'Al Ahli Hospital', distance: '10 min drive' }
-    ]
-  };
-
-  return places[area] || [
-    { icon: '🛍️', name: 'Shopping Center', distance: '10 min' },
-    { icon: '🍽️', name: 'Restaurants', distance: '5 min' },
-    { icon: '☕', name: 'Cafes', distance: '3 min' },
-    { icon: '🏪', name: 'Supermarket', distance: '5 min' },
-    { icon: '🏥', name: 'Medical Center', distance: '10 min' },
-    { icon: '🏫', name: 'Schools', distance: '7 min' }
-  ];
 }

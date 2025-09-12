@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import apiService from '@/lib/api';
 
 const AuthContext = createContext({});
 
@@ -27,18 +28,13 @@ export function AuthProvider({ children }) {
         
         // Optionally verify token with backend
         try {
-          const response = await fetch('/api/auth/verify', {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          
-          if (!response.ok) {
+          const profile = await apiService.getProfile();
+          if (!profile) {
             // Token invalid, clear storage
             logout();
           }
         } catch (error) {
-          console.log('Token verification skipped');
+          console.log('Token verification skipped:', error.message);
         }
       }
     } catch (error) {
@@ -48,61 +44,44 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const login = async (email, password) => {
+  const login = async (email, password, rememberMe = false) => {
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Store user data and token
-        localStorage.setItem('user', JSON.stringify(data.user));
+      console.log('Attempting login with:', { email, hasPassword: !!password, rememberMe });
+      
+      const data = await apiService.login({ email, password, rememberMe });
+      console.log('Login success data:', data);
+      
+      // Store user data and token if available
+      localStorage.setItem('user', JSON.stringify(data.user));
+      if (data.token) {
         localStorage.setItem('token', data.token);
-        
-        setUser(data.user);
-        
-        return { success: true };
-      } else {
-        const error = await response.json();
-        return { success: false, error: error.message || 'Login failed' };
       }
+      
+      setUser(data.user);
+      
+      return true; // Return true for success for backwards compatibility
     } catch (error) {
-      return { success: false, error: 'Network error' };
+      console.error('Login error:', error);
+      return false;
     }
   };
 
   const register = async (userData) => {
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData)
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Store user data and token
-        localStorage.setItem('user', JSON.stringify(data.user));
+      const data = await apiService.register(userData);
+      
+      // Store user data and token if available
+      localStorage.setItem('user', JSON.stringify(data.user));
+      if (data.token) {
         localStorage.setItem('token', data.token);
-        
-        setUser(data.user);
-        
-        return { success: true };
-      } else {
-        const error = await response.json();
-        return { success: false, error: error.message || 'Registration failed' };
       }
+      
+      setUser(data.user);
+      
+      return { success: true };
     } catch (error) {
-      return { success: false, error: 'Network error' };
+      console.error('Registration error:', error);
+      return { success: false, error: error.message || 'Registration failed' };
     }
   };
 

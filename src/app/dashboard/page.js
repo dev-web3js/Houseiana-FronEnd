@@ -8,7 +8,7 @@ import AdvancedFilterModal from '@/components/AdvancedFilterModal';
 
 export default function UnifiedDashboard() {
   const router = useRouter();
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, updateUser } = useAuth();
   const [activeView, setActiveView] = useState('guest'); // 'guest' or 'host'
   const [showBecomeHostModal, setShowBecomeHostModal] = useState(false);
   const [checkIn, setCheckIn] = useState('');
@@ -16,6 +16,8 @@ export default function UnifiedDashboard() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [location, setLocation] = useState('Doha');
   const [guests, setGuests] = useState('1');
+  const [properties, setProperties] = useState([]);
+  const [loadingProperties, setLoadingProperties] = useState(false);
   
   // Advanced filters state
   const [filters, setFilters] = useState({
@@ -53,21 +55,65 @@ export default function UnifiedDashboard() {
     }
   }, [user, loading, router]);
 
+  // Fetch properties when user is a host
+  useEffect(() => {
+    const fetchProperties = async () => {
+      if (user && (user.role === 'host' || user.role === 'both' || user.isHost)) {
+        setLoadingProperties(true);
+        try {
+          const response = await fetch('/api/host/properties/create', {
+            method: 'GET',
+            credentials: 'include'
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            setProperties(data.properties || []);
+          } else {
+            console.error('Failed to fetch properties');
+          }
+        } catch (error) {
+          console.error('Error fetching properties:', error);
+        } finally {
+          setLoadingProperties(false);
+        }
+      }
+    };
+
+    fetchProperties();
+  }, [user, activeView]);
+
   const handleBecomeHost = async () => {
     try {
+      // First test authentication
+      const authTest = await fetch('/api/test-auth', {
+        credentials: 'include'
+      });
+      const authData = await authTest.json();
+      console.log('Auth test before become-host:', authData);
+      
       const response = await fetch('/api/user/become-host', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include' // Include cookies
       });
 
       if (response.ok) {
         const updatedUser = await response.json();
-        setUser(updatedUser);
+        
+        // Update the user in auth context and localStorage
+        updateUser(updatedUser);
+        
+        // Update the view and close modal
         setShowBecomeHostModal(false);
-        setActiveView('host');
+        setActiveView('host'); // Switch to host view immediately
+        
+        // Show success message
         alert('Congratulations! You are now a host. Welcome to the host dashboard!');
       } else {
-        alert('Failed to upgrade to host. Please try again.');
+        const error = await response.json();
+        console.error('Failed to become host:', error);
+        alert(error.message || 'Failed to upgrade to host. Please try again.');
       }
     } catch (error) {
       console.error('Error becoming host:', error);
@@ -202,167 +248,231 @@ export default function UnifiedDashboard() {
             {activeView === 'guest' ? (
               <>
                 <li style={{ marginBottom: '4px' }}>
-                  <Link href="/dashboard" style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '12px 16px',
-                    backgroundColor: '#eff6ff',
-                    borderRadius: '10px',
-                    textDecoration: 'none',
-                    color: '#2563eb',
-                    fontWeight: '500',
-                    gap: '12px'
-                  }}>
+                  <button
+                    onClick={() => router.push('/dashboard')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px 16px',
+                      backgroundColor: '#eff6ff',
+                      borderRadius: '10px',
+                      border: 'none',
+                      color: '#2563eb',
+                      fontWeight: '500',
+                      gap: '12px',
+                      width: '100%',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}>
                     🏠 Dashboard
-                  </Link>
+                  </button>
                 </li>
                 <li style={{ marginBottom: '4px' }}>
-                  <Link href="/search" style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    textDecoration: 'none',
-                    color: '#64748b',
-                    fontWeight: '500',
-                    gap: '12px'
-                  }}>
+                  <button
+                    onClick={() => router.push('/search')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: '#64748b',
+                      fontWeight: '500',
+                      gap: '12px',
+                      width: '100%',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}>
                     🔍 Search Properties
-                  </Link>
+                  </button>
                 </li>
                 <li style={{ marginBottom: '4px' }}>
-                  <Link href="/bookings" style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    textDecoration: 'none',
-                    color: '#64748b',
-                    fontWeight: '500',
-                    gap: '12px'
-                  }}>
+                  <button
+                    onClick={() => router.push('/bookings')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: '#64748b',
+                      fontWeight: '500',
+                      gap: '12px',
+                      width: '100%',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}>
                     📅 My Bookings
-                  </Link>
+                  </button>
                 </li>
                 <li style={{ marginBottom: '4px' }}>
-                  <Link href="/saved" style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    textDecoration: 'none',
-                    color: '#64748b',
-                    fontWeight: '500',
-                    gap: '12px'
-                  }}>
+                  <button
+                    onClick={() => router.push('/saved')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: '#64748b',
+                      fontWeight: '500',
+                      gap: '12px',
+                      width: '100%',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}>
                     ❤️ Saved Properties
-                  </Link>
+                  </button>
                 </li>
               </>
             ) : (
               <>
                 <li style={{ marginBottom: '4px' }}>
-                  <Link href="/host/dashboard" style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '12px 16px',
-                    backgroundColor: '#eff6ff',
-                    borderRadius: '10px',
-                    textDecoration: 'none',
-                    color: '#2563eb',
-                    fontWeight: '500',
-                    gap: '12px'
-                  }}>
+                  <button
+                    onClick={() => router.push('/host/dashboard')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px 16px',
+                      backgroundColor: '#eff6ff',
+                      borderRadius: '10px',
+                      border: 'none',
+                      color: '#2563eb',
+                      fontWeight: '500',
+                      gap: '12px',
+                      width: '100%',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}>
                     📊 Host Dashboard
-                  </Link>
+                  </button>
                 </li>
                 <li style={{ marginBottom: '4px' }}>
-                  <Link href="/host/properties" style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    textDecoration: 'none',
-                    color: '#64748b',
-                    fontWeight: '500',
-                    gap: '12px'
-                  }}>
+                  <button
+                    onClick={() => router.push('/host/properties')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: '#64748b',
+                      fontWeight: '500',
+                      gap: '12px',
+                      width: '100%',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}>
                     🏘️ My Properties
-                  </Link>
+                  </button>
                 </li>
                 <li style={{ marginBottom: '4px' }}>
-                  <Link href="/host/bookings" style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    textDecoration: 'none',
-                    color: '#64748b',
-                    fontWeight: '500',
-                    gap: '12px'
-                  }}>
+                  <button
+                    onClick={() => router.push('/host/bookings')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: '#64748b',
+                      fontWeight: '500',
+                      gap: '12px',
+                      width: '100%',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}>
                     📋 Reservations
-                  </Link>
+                  </button>
                 </li>
                 <li style={{ marginBottom: '4px' }}>
-                  <Link href="/host/earnings" style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    textDecoration: 'none',
-                    color: '#64748b',
-                    fontWeight: '500',
-                    gap: '12px'
-                  }}>
+                  <button
+                    onClick={() => router.push('/host/earnings')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: '#64748b',
+                      fontWeight: '500',
+                      gap: '12px',
+                      width: '100%',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}>
                     💰 Earnings
-                  </Link>
+                  </button>
                 </li>
                 <li style={{ marginBottom: '4px' }}>
-                  <Link href="/host/properties/create" style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    textDecoration: 'none',
-                    color: '#64748b',
-                    fontWeight: '500',
-                    gap: '12px'
-                  }}>
+                  <button
+                    onClick={() => router.push('/host/properties/create')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: '#64748b',
+                      fontWeight: '500',
+                      gap: '12px',
+                      width: '100%',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}>
                     ➕ Add Property
-                  </Link>
+                  </button>
                 </li>
               </>
             )}
             
             {/* Common Links */}
             <li style={{ marginBottom: '4px', marginTop: '16px' }}>
-              <Link href="/messages" style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '12px 16px',
-                borderRadius: '10px',
-                textDecoration: 'none',
-                color: '#64748b',
-                fontWeight: '500',
-                gap: '12px'
-              }}>
+              <button
+                onClick={() => router.push('/messages')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: '#64748b',
+                  fontWeight: '500',
+                  gap: '12px',
+                  width: '100%',
+                  cursor: 'pointer',
+                  textAlign: 'left'
+                }}>
                 💬 Messages
-              </Link>
+              </button>
             </li>
             <li style={{ marginBottom: '4px' }}>
-              <Link href="/profile" style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '12px 16px',
-                borderRadius: '10px',
-                textDecoration: 'none',
-                color: '#64748b',
-                fontWeight: '500',
-                gap: '12px'
-              }}>
+              <button
+                onClick={() => router.push('/profile')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: '#64748b',
+                  fontWeight: '500',
+                  gap: '12px',
+                  width: '100%',
+                  cursor: 'pointer',
+                  textAlign: 'left'
+                }}>
                 👤 Profile
-              </Link>
+              </button>
             </li>
           </ul>
         </nav>
@@ -858,29 +968,172 @@ export default function UnifiedDashboard() {
                 color: '#1e293b',
                 marginBottom: '20px'
               }}>
-                Your Properties
+                Your Properties {properties.length > 0 && `(${properties.length})`}
               </h2>
-              <div style={{
-                textAlign: 'center',
-                padding: '48px 0',
-                color: '#94a3b8'
-              }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏠</div>
-                <p style={{ fontSize: '16px', marginBottom: '8px' }}>No properties yet</p>
-                <p style={{ fontSize: '14px', marginBottom: '16px' }}>Start by adding your first property</p>
-                <Link href="/host/properties/create" style={{
-                  padding: '10px 24px',
-                  backgroundColor: '#2563eb',
-                  color: 'white',
-                  borderRadius: '8px',
-                  textDecoration: 'none',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  display: 'inline-block'
+              {loadingProperties ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '48px 0',
+                  color: '#94a3b8'
                 }}>
-                  Add Property
-                </Link>
-              </div>
+                  <div style={{ fontSize: '24px', marginBottom: '16px' }}>Loading properties...</div>
+                </div>
+              ) : properties.length > 0 ? (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                  gap: '20px'
+                }}>
+                  {properties.map((property) => (
+                    <div key={property.id} style={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      backgroundColor: '#fafafa',
+                      transition: 'transform 0.2s',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}>
+                      {/* Property Image */}
+                      {property.photos && property.photos.length > 0 ? (
+                        <div style={{
+                          width: '100%',
+                          height: '180px',
+                          borderRadius: '8px',
+                          backgroundImage: `url(${property.photos[0].url || property.photos[0]})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          marginBottom: '12px'
+                        }} />
+                      ) : (
+                        <div style={{
+                          width: '100%',
+                          height: '180px',
+                          borderRadius: '8px',
+                          backgroundColor: '#e2e8f0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginBottom: '12px',
+                          fontSize: '48px'
+                        }}>
+                          🏠
+                        </div>
+                      )}
+                      
+                      {/* Property Info */}
+                      <h3 style={{
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        marginBottom: '8px',
+                        color: '#1e293b'
+                      }}>
+                        {property.title}
+                      </h3>
+                      
+                      <p style={{
+                        fontSize: '14px',
+                        color: '#64748b',
+                        marginBottom: '8px'
+                      }}>
+                        📍 {property.area}, {property.city}
+                      </p>
+                      
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '12px'
+                      }}>
+                        <div style={{ fontSize: '14px', color: '#64748b' }}>
+                          🛏️ {property.bedrooms} BR • 🚿 {property.bathrooms} BA
+                        </div>
+                        <div style={{
+                          fontSize: '16px',
+                          fontWeight: '600',
+                          color: '#2563eb'
+                        }}>
+                          QAR {property.monthlyPrice?.toLocaleString() || property.monthlyRent || '0'}/mo
+                        </div>
+                      </div>
+                      
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        paddingTop: '12px',
+                        borderTop: '1px solid #e2e8f0'
+                      }}>
+                        <span style={{
+                          padding: '4px 8px',
+                          backgroundColor: property.status === 'active' ? '#10b981' : '#f59e0b',
+                          color: 'white',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}>
+                          {property.status === 'active' ? 'Active' : 'Inactive'}
+                        </span>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button style={{
+                            padding: '6px 12px',
+                            backgroundColor: '#f1f5f9',
+                            color: '#475569',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            cursor: 'pointer'
+                          }}>
+                            Edit
+                          </button>
+                          <button style={{
+                            padding: '6px 12px',
+                            backgroundColor: '#fee2e2',
+                            color: '#dc2626',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            cursor: 'pointer'
+                          }}>
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '48px 0',
+                  color: '#94a3b8'
+                }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏠</div>
+                  <p style={{ fontSize: '16px', marginBottom: '8px' }}>No properties yet</p>
+                  <p style={{ fontSize: '14px', marginBottom: '16px' }}>Start by adding your first property</p>
+                  <Link href="/host/properties/create" style={{
+                    padding: '10px 24px',
+                    backgroundColor: '#2563eb',
+                    color: 'white',
+                    borderRadius: '8px',
+                    textDecoration: 'none',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    display: 'inline-block'
+                  }}>
+                    Add Property
+                  </Link>
+                </div>
+              )}
             </div>
           </>
         )}

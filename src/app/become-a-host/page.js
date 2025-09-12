@@ -3,12 +3,15 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function BecomeAHostPage() {
   const router = useRouter();
+  const { user, loading, updateUser } = useAuth();
   const [showVideo, setShowVideo] = useState(false);
   const [selectedFAQ, setSelectedFAQ] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -19,6 +22,56 @@ export default function BecomeAHostPage() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  useEffect(() => {
+    // If user is already a host, redirect to dashboard
+    if (!loading && user && (user.role === 'host' || user.role === 'both')) {
+      router.push('/dashboard');
+    }
+  }, [user, loading, router]);
+
+  const handleBecomeHost = async () => {
+    if (!user) {
+      // If not logged in, redirect to sign-in with redirect back
+      localStorage.setItem('redirectAfterLogin', '/become-a-host');
+      router.push('/auth/sign-in');
+      return;
+    }
+
+    setIsUpgrading(true);
+
+    try {
+      const response = await fetch('/api/user/become-host', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const updatedUser = await response.json();
+        
+        // Update the user in auth context
+        updateUser(updatedUser);
+        
+        // Show success and redirect to dashboard
+        alert('Congratulations! You are now a host. Redirecting to your dashboard...');
+        
+        // Redirect to dashboard after a short delay
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 1500);
+      } else {
+        const error = await response.json();
+        console.error('Failed to become host:', error);
+        alert(error.message || 'Failed to upgrade to host. Please try again.');
+        setIsUpgrading(false);
+      }
+    } catch (error) {
+      console.error('Error becoming host:', error);
+      alert('An error occurred. Please try again.');
+      setIsUpgrading(false);
+    }
+  };
 
   const faqs = [
     {
@@ -60,179 +113,111 @@ export default function BecomeAHostPage() {
           <Link href="/" style={{
             fontSize: '24px',
             fontWeight: 'bold',
-            color: '#2563eb',
+            color: '#FF385C',
             textDecoration: 'none'
           }}>
-            Houseiana
+            🏠 Houseiana
           </Link>
-          <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-            <Link href="/auth/sign-in" style={{
-              color: '#6b7280',
-              textDecoration: 'none',
-              fontSize: '14px'
-            }}>
-              Host Sign In
-            </Link>
-            <button
-              onClick={() => router.push('/auth/sign-up')}
-              style={{
-                padding: '10px 24px',
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            {user ? (
+              <>
+                <span style={{ color: '#6b7280' }}>
+                  Welcome, {user.firstName || user.email}
+                </span>
+                <Link href="/dashboard" style={{
+                  padding: '8px 16px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  color: '#374151',
+                  textDecoration: 'none'
+                }}>
+                  Dashboard
+                </Link>
+              </>
+            ) : (
+              <Link href="/auth/sign-in" style={{
+                padding: '8px 16px',
                 backgroundColor: '#2563eb',
                 color: 'white',
-                border: 'none',
                 borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              Start Earning
-            </button>
+                textDecoration: 'none',
+                fontWeight: '500'
+              }}>
+                Sign In
+              </Link>
+            )}
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
       <section style={{
-        background: 'linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%)',
-        padding: '100px 24px',
-        color: 'white'
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: isMobile ? '60px 20px' : '120px 24px',
+        color: 'white',
+        textAlign: 'center'
       }}>
-        <div style={{
-          maxWidth: '1200px',
-          margin: '0 auto',
-          display: 'grid',
-          gridTemplateColumns: !isMobile ? '1fr 1fr' : '1fr',
-          gap: '60px',
-          alignItems: 'center'
-        }}>
-          <div>
-            <h1 style={{
-              fontSize: '48px',
-              fontWeight: 'bold',
-              marginBottom: '24px',
-              lineHeight: '1.1'
-            }}>
-              Earn up to QAR 8,000 per month from your property
-            </h1>
-            <p style={{
-              fontSize: '20px',
-              marginBottom: '32px',
-              opacity: 0.9
-            }}>
-              Join 500+ successful hosts in Qatar earning steady monthly income with guaranteed long-term tenants.
-            </p>
-            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => router.push('/auth/sign-up')}
-                style={{
-                  padding: '14px 32px',
-                  backgroundColor: 'white',
-                  color: '#2563eb',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'transform 0.2s'
-                }}
-                onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
-                onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-              >
-                Get Started - 5 Minutes
-              </button>
-              <button
-                onClick={() => setShowVideo(true)}
-                style={{
-                  padding: '14px 32px',
-                  backgroundColor: 'transparent',
-                  color: 'white',
-                  border: '2px solid white',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-              >
-                Watch How It Works
-              </button>
-            </div>
-          </div>
-          <div style={{
-            display: !isMobile ? 'block' : 'none',
-            position: 'relative'
+        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+          <h1 style={{
+            fontSize: isMobile ? '36px' : '56px',
+            fontWeight: 'bold',
+            marginBottom: '24px',
+            lineHeight: 1.2
           }}>
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              padding: '32px',
-              color: '#111827',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+            Turn Your Space Into Monthly Income
+          </h1>
+          <p style={{
+            fontSize: isMobile ? '18px' : '24px',
+            marginBottom: '40px',
+            opacity: 0.95
+          }}>
+            Join 500+ hosts in Qatar earning QAR 3,000-8,000 per month
+          </p>
+          
+          {/* CTA Button based on user status */}
+          {loading ? (
+            <button disabled style={{
+              padding: '16px 32px',
+              backgroundColor: '#9ca3af',
+              color: 'white',
+              fontSize: '18px',
+              fontWeight: '600',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'not-allowed'
             }}>
-              <h3 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px' }}>
-                Average Host Earnings
-              </h3>
-              <div style={{ marginBottom: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span>Studio</span>
-                  <span style={{ fontWeight: 'bold' }}>QAR 2,500-3,500/mo</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span>1 Bedroom</span>
-                  <span style={{ fontWeight: 'bold' }}>QAR 3,500-5,000/mo</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span>2 Bedroom</span>
-                  <span style={{ fontWeight: 'bold' }}>QAR 4,500-7,000/mo</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>3+ Bedroom</span>
-                  <span style={{ fontWeight: 'bold' }}>QAR 6,000-10,000/mo</span>
-                </div>
-              </div>
-              <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '16px' }}>
-                *Based on properties in prime locations with standard amenities
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Trust Indicators */}
-      <section style={{
-        backgroundColor: '#f9fafb',
-        padding: '40px 24px',
-        borderBottom: '1px solid #e5e7eb'
-      }}>
-        <div style={{
-          maxWidth: '1200px',
-          margin: '0 auto',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '40px',
-          textAlign: 'center'
-        }}>
-          <div>
-            <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#2563eb' }}>500+</div>
-            <p style={{ color: '#6b7280', marginTop: '4px' }}>Active Hosts</p>
-          </div>
-          <div>
-            <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#2563eb' }}>QAR 2M+</div>
-            <p style={{ color: '#6b7280', marginTop: '4px' }}>Paid Monthly</p>
-          </div>
-          <div>
-            <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#2563eb' }}>95%</div>
-            <p style={{ color: '#6b7280', marginTop: '4px' }}>Occupancy Rate</p>
-          </div>
-          <div>
-            <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#2563eb' }}>4.8★</div>
-            <p style={{ color: '#6b7280', marginTop: '4px' }}>Average Rating</p>
-          </div>
+              Loading...
+            </button>
+          ) : (
+            <button
+              onClick={handleBecomeHost}
+              disabled={isUpgrading}
+              style={{
+                padding: '16px 32px',
+                backgroundColor: isUpgrading ? '#9ca3af' : 'white',
+                color: isUpgrading ? 'white' : '#667eea',
+                fontSize: '18px',
+                fontWeight: '600',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: isUpgrading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s',
+                transform: 'scale(1)',
+              }}
+              onMouseEnter={(e) => !isUpgrading && (e.target.style.transform = 'scale(1.05)')}
+              onMouseLeave={(e) => !isUpgrading && (e.target.style.transform = 'scale(1)')}
+            >
+              {isUpgrading ? 'Upgrading...' : (user ? 'Become a Host Now' : 'Get Started')}
+            </button>
+          )}
         </div>
       </section>
 
       {/* Benefits Section */}
-      <section style={{ padding: '80px 24px' }}>
+      <section style={{
+        padding: '80px 24px',
+        backgroundColor: '#f9fafb'
+      }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <h2 style={{
             fontSize: '40px',
@@ -240,163 +225,42 @@ export default function BecomeAHostPage() {
             textAlign: 'center',
             marginBottom: '60px'
           }}>
-            Why hosts love Houseiana
+            Why host with Houseiana?
           </h2>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
-            gap: '40px'
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+            gap: '32px'
           }}>
-            <div style={{ display: 'flex', gap: '20px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                backgroundColor: '#dbeafe',
+            {[
+              { icon: '💰', title: 'Higher Earnings', desc: 'Monthly rentals mean stable income with less turnover' },
+              { icon: '🛡️', title: 'Property Protection', desc: 'Coverage up to QAR 50,000 for property damages' },
+              { icon: '👥', title: 'Quality Tenants', desc: 'Verified professionals and families for monthly stays' },
+              { icon: '📱', title: 'Easy Management', desc: 'Simple dashboard to manage bookings and payments' },
+              { icon: '🌍', title: 'Global Reach', desc: 'Access to international guests and expats' },
+              { icon: '🤝', title: '24/7 Support', desc: 'Dedicated host support team available anytime' }
+            ].map((benefit, index) => (
+              <div key={index} style={{
+                backgroundColor: 'white',
+                padding: '32px',
                 borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                fontSize: '24px'
+                textAlign: 'center',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
               }}>
-                💰
-              </div>
-              <div>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>{benefit.icon}</div>
                 <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px' }}>
-                  Guaranteed Monthly Income
+                  {benefit.title}
                 </h3>
-                <p style={{ color: '#6b7280', lineHeight: '1.6' }}>
-                  No more worrying about vacancies. Our long-term rental model ensures steady monthly payments directly to your bank account.
-                </p>
+                <p style={{ color: '#6b7280' }}>{benefit.desc}</p>
               </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '20px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                backgroundColor: '#dcfce7',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                fontSize: '24px'
-              }}>
-                🛡️
-              </div>
-              <div>
-                <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px' }}>
-                  Property Protection
-                </h3>
-                <p style={{ color: '#6b7280', lineHeight: '1.6' }}>
-                  Your property is covered with up to QAR 50,000 protection against damages. We handle all tenant screening and verification.
-                </p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '20px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                backgroundColor: '#fef3c7',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                fontSize: '24px'
-              }}>
-                🎯
-              </div>
-              <div>
-                <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px' }}>
-                  Vetted Tenants
-                </h3>
-                <p style={{ color: '#6b7280', lineHeight: '1.6' }}>
-                  We carefully screen all tenants including background checks, employment verification, and previous rental history.
-                </p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '20px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                backgroundColor: '#fce7f3',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                fontSize: '24px'
-              }}>
-                📱
-              </div>
-              <div>
-                <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px' }}>
-                  Easy Management
-                </h3>
-                <p style={{ color: '#6b7280', lineHeight: '1.6' }}>
-                  Manage everything from your phone. Track earnings, communicate with tenants, and update listings from our dashboard.
-                </p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '20px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                backgroundColor: '#e0e7ff',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                fontSize: '24px'
-              }}>
-                🏆
-              </div>
-              <div>
-                <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px' }}>
-                  Premium Support
-                </h3>
-                <p style={{ color: '#6b7280', lineHeight: '1.6' }}>
-                  24/7 support team ready to help. We handle maintenance coordination, tenant issues, and emergency situations.
-                </p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '20px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                backgroundColor: '#ffedd5',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                fontSize: '24px'
-              }}>
-                📈
-              </div>
-              <div>
-                <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px' }}>
-                  Dynamic Pricing
-                </h3>
-                <p style={{ color: '#6b7280', lineHeight: '1.6' }}>
-                  Our algorithm optimizes your pricing based on market demand, ensuring maximum occupancy at the best rates.
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* How It Works */}
+      {/* Steps Section */}
       <section style={{
-        backgroundColor: '#f9fafb',
+        backgroundColor: '#f3f4f6',
         padding: '80px 24px'
       }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
@@ -410,7 +274,7 @@ export default function BecomeAHostPage() {
           </h2>
           <div style={{ display: 'grid', gap: '40px' }}>
             {[
-              { number: '1', title: 'Sign Up', desc: 'Create your host account in just 5 minutes', time: '5 min' },
+              { number: '1', title: 'Sign Up', desc: 'Create your account or upgrade existing account', time: '2 min' },
               { number: '2', title: 'List Your Property', desc: 'Add photos, amenities, and set your price', time: '10 min' },
               { number: '3', title: 'Get Verified', desc: 'We verify your property and documents', time: '24-48 hrs' },
               { number: '4', title: 'Start Earning', desc: 'Receive bookings and monthly payments', time: 'Immediate' }
@@ -497,18 +361,16 @@ export default function BecomeAHostPage() {
                   <h3 style={{ fontSize: '18px', fontWeight: '600' }}>{faq.question}</h3>
                   <span style={{
                     fontSize: '24px',
-                    color: '#6b7280',
-                    transform: selectedFAQ === index ? 'rotate(180deg)' : 'rotate(0)',
-                    transition: 'transform 0.2s'
+                    transform: selectedFAQ === index ? 'rotate(45deg)' : 'rotate(0)',
+                    transition: 'transform 0.3s'
                   }}>
-                    ↓
+                    +
                   </span>
                 </button>
                 {selectedFAQ === index && (
                   <div style={{
                     padding: '0 24px 24px',
-                    color: '#6b7280',
-                    lineHeight: '1.6'
+                    color: '#6b7280'
                   }}>
                     {faq.answer}
                   </div>
@@ -542,22 +404,23 @@ export default function BecomeAHostPage() {
             Join 500+ successful hosts in Qatar today
           </p>
           <button
-            onClick={() => router.push('/auth/sign-up')}
+            onClick={handleBecomeHost}
+            disabled={isUpgrading}
             style={{
               padding: '16px 40px',
-              backgroundColor: 'white',
-              color: '#2563eb',
+              backgroundColor: isUpgrading ? '#9ca3af' : 'white',
+              color: isUpgrading ? 'white' : '#2563eb',
               border: 'none',
               borderRadius: '8px',
               fontSize: '18px',
               fontWeight: '600',
-              cursor: 'pointer',
+              cursor: isUpgrading ? 'not-allowed' : 'pointer',
               transition: 'transform 0.2s'
             }}
-            onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
-            onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+            onMouseEnter={(e) => !isUpgrading && (e.target.style.transform = 'scale(1.05)')}
+            onMouseLeave={(e) => !isUpgrading && (e.target.style.transform = 'scale(1)')}
           >
-            Start Your Host Journey
+            {isUpgrading ? 'Processing...' : 'Start Your Host Journey'}
           </button>
         </div>
       </section>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Base64 Photo Upload</title>
+</head>
+<body>
+    <h1>Test Base64 Photo Upload</h1>
+    <input type="file" id="fileInput" accept="image/*" multiple>
+    <div id="output"></div>
+    
+    <script>
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            const output = document.getElementById('output');
+            output.innerHTML = '';
+            
+            for (const file of files) {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    const base64 = e.target.result;
+                    
+                    // Display the image
+                    const img = document.createElement('img');
+                    img.src = base64;
+                    img.style.width = '200px';
+                    img.style.margin = '10px';
+                    output.appendChild(img);
+                    
+                    // Show base64 string info
+                    const info = document.createElement('p');
+                    info.textContent = `File: ${file.name}, Base64 length: ${base64.length} chars`;
+                    output.appendChild(info);
+                    
+                    // Show first 100 chars of base64
+                    const preview = document.createElement('pre');
+                    preview.textContent = base64.substring(0, 100) + '...';
+                    preview.style.fontSize = '10px';
+                    preview.style.background = '#f0f0f0';
+                    preview.style.padding = '10px';
+                    preview.style.overflow = 'auto';
+                    output.appendChild(preview);
+                };
+                
+                reader.readAsDataURL(file);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -46,17 +46,17 @@ export default function SignUpPage() {
     setLoading(true);
     
     try {
-      const success = await register(
-        formData.email,
-        formData.password,
-        formData.firstName,
-        formData.lastName
-      );
+      const result = await register({
+        email: formData.email,
+        password: formData.password,
+        firstName: formData.firstName,
+        lastName: formData.lastName
+      });
       
-      if (success) {
+      if (result.success) {
         router.push("/");
       } else {
-        setErrors({ submit: "Sign up failed. Email may already be in use." });
+        setErrors({ submit: result.error || "Sign up failed. Email may already be in use." });
       }
     } catch (error) {
       setErrors({ submit: "Something went wrong. Please try again." });

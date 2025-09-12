@@ -119,10 +119,10 @@ export default function MainLayout({ children }) {
             alignItems: 'center',
             gap: '16px'
           }}>
-            {/* Become a Host Button - Only show when logged in */}
-            {user && (
+            {/* Become a Host Button - Only show when logged in and not already a host */}
+            {user && user.role === 'guest' && (
               <Link
-                href="/become-host"
+                href="/become-a-host"
                 style={{
                   padding: '10px 16px',
                   color: '#222',

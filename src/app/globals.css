@@ -1,8 +1,28 @@
-@import "tailwindcss";
+/* Louis Vuitton Inspired Luxury Theme */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* LV Orange Color Palette */
+  --primary: #FF6F00; /* Main LV Orange */
+  --primary-dark: #E65100;
+  --primary-light: #FF9233;
+  --primary-50: #FFF4E6;
+  --primary-100: #FFE4CC;
+  
+  /* Luxury Colors */
+  --dark: #0A0A0A;
+  --gold: #D4AF37;
+  --bronze: #CD7F32;
+  --champagne: #F7E7CE;
+  
+  /* Base */
+  --background: #FFFFFF;
+  --foreground: #1A1A1A;
+  
+  /* Typography */
+  --font-heading: 'Playfair Display', serif;
+  --font-body: 'Inter', sans-serif;
+  --font-luxury: 'Montserrat', sans-serif;
 }
 
 * {
@@ -11,37 +31,86 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  background: var(--background);
+  font-family: var(--font-body);
   color: var(--foreground);
-  font-family: system-ui, -apple-system, sans-serif;
+  background: linear-gradient(135deg, #FFFFFF 0%, #FFF4E6 50%, #FFFFFF 100%);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Ensure flexbox works properly */
-.flex {
-  display: flex !important;
+/* Luxury Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--dark);
 }
 
-.flex-col {
-  flex-direction: column !important;
+/* Luxury Buttons */
+.btn-luxury {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: white;
+  padding: 14px 36px;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 10px 30px rgba(255, 111, 0, 0.3);
 }
 
-.flex-row {
-  flex-direction: row !important;
+.btn-luxury:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 40px rgba(255, 111, 0, 0.4);
 }
 
-.items-center {
-  align-items: center !important;
+/* Cards */
+.card-luxury {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
 }
 
-.justify-between {
-  justify-content: space-between !important;
+.card-luxury:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
 }
 
-.space-x-4 > * + * {
-  margin-left: 1rem !important;
+/* Gradient Text */
+.gradient-text {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.space-x-8 > * + * {
-  margin-left: 2rem !important;
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--primary-50);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 5px;
+}
+
+/* Selection */
+::selection {
+  background: var(--primary);
+  color: white;
 }

@@ -1,0 +1,25 @@
+version: 1
+applications:
+  - frontend:
+      phases:
+        preBuild:
+          commands:
+            - npm ci
+        build:
+          commands:
+            - npm run prisma:generate
+            - npm run build
+      artifacts:
+        baseDirectory: .next
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*
+          - .next/cache/**/*
+      buildSettings:
+        env:
+          variables:
+            # Amplify will automatically add your environment variables
+            AMPLIFY_MONOREPO_APP_ROOT: web
+            AMPLIFY_DIFF_DEPLOY: false

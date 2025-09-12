@@ -45,7 +45,11 @@ export default function SignInPage() {
     setLoading(true);
     
     try {
-      const success = await login(formData.email, formData.password, formData.rememberMe);
+      // Clean up input data
+      const cleanEmail = formData.email.trim().toLowerCase();
+      const cleanPassword = formData.password.trim();
+      
+      const success = await login(cleanEmail, cleanPassword, formData.rememberMe);
       
       if (success) {
         // Check for redirect URL

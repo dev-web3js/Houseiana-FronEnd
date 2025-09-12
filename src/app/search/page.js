@@ -3,9 +3,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import PropertyCard from "@/components/PropertyCard";
-import FilterModal from "@/components/FilterModal";
-import AdvancedFilterModal from "@/components/AdvancedFilterModal";
+import dynamic from "next/dynamic";
+
+// Dynamically import map to avoid SSR issues
+const PropertyMap = dynamic(() => import('@/components/PropertyMap'), { 
+  ssr: false,
+  loading: () => <div style={{ height: '100%', backgroundColor: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading map...</div>
+});
+
+// Import the Airbnb-style property card
+import AirbnbPropertyCard from '@/components/AirbnbPropertyCard';
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
@@ -13,36 +20,32 @@ export default function SearchPage() {
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [viewMode, setViewMode] = useState("grid");
-  const [totalResults, setTotalResults] = useState(0);
+  const [showMap, setShowMap] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false
+  });
   
   const [filters, setFilters] = useState({
     location: searchParams.get("location") || "",
-    checkIn: searchParams.get("checkIn") || "",
-    checkOut: searchParams.get("checkOut") || "",
+    checkin: searchParams.get("checkin") || "",
+    checkout: searchParams.get("checkout") || "",
     guests: searchParams.get("guests") || "1",
-    priceMin: searchParams.get("priceMin") || 2000,
-    priceMax: searchParams.get("priceMax") || 240000,
+    minPrice: searchParams.get("minPrice") || null,
+    maxPrice: searchParams.get("maxPrice") || null,
     propertyType: searchParams.get("propertyType") || "all",
+    bedrooms: searchParams.get("bedrooms") || null,
+    bathrooms: searchParams.get("bathrooms") || null,
     amenities: searchParams.get("amenities")?.split(",") || [],
     instantBook: searchParams.get("instantBook") === "true",
-    tier: searchParams.get("tier") || "all",
+    superhost: searchParams.get("superhost") === "true",
     sortBy: searchParams.get("sortBy") || "relevance",
-    // Advanced filters
-    placeType: searchParams.get("placeType") || "any",
-    bedrooms: searchParams.get("bedrooms") || "any",
-    beds: searchParams.get("beds") || "any",
-    bathrooms: searchParams.get("bathrooms") || "any",
-    topAmenities: searchParams.get("topAmenities")?.split(",") || [],
-    selfCheckIn: searchParams.get("selfCheckIn") === "true",
-    freeCancellation: searchParams.get("freeCancellation") === "true",
-    allowsPets: searchParams.get("allowsPets") === "true",
-    guestFavorite: searchParams.get("guestFavorite") === "true",
-    luxe: searchParams.get("luxe") === "true",
-    propertyTypes: searchParams.get("propertyTypes")?.split(",") || [],
-    accessibilityFeatures: searchParams.get("accessibilityFeatures")?.split(",") || [],
-    hostLanguages: searchParams.get("hostLanguages")?.split(",") || []
+    page: parseInt(searchParams.get("page")) || 1
   });
 
   const propertyTypes = [
@@ -69,30 +72,36 @@ export default function SearchPage() {
     try {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
-        if (value && value !== "all") {
+        if (value && value !== "all" && value !== null && value !== "") {
           if (key === "amenities" && Array.isArray(value) && value.length > 0) {
             params.append(key, value.join(","));
-          } else if (value) {
-            params.append(key, value);
+          } else {
+            params.append(key, value.toString());
           }
         }
       });
 
-      const response = await fetch(`/api/properties/search?${params}`);
+      const response = await fetch(`/api/search/properties?${params}`);
       
       if (response.ok) {
         const data = await response.json();
         setProperties(data.properties || []);
-        setTotalResults(data.total || 0);
+        setPagination(data.pagination || {
+          page: 1, limit: 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false
+        });
       } else {
-        // Use mock data for now
+        console.error("Search API error:", response.statusText);
         setProperties(getMockProperties());
-        setTotalResults(3);
+        setPagination({
+          page: 1, limit: 20, total: 3, totalPages: 1, hasNext: false, hasPrev: false
+        });
       }
     } catch (error) {
       console.error("Search error:", error);
       setProperties(getMockProperties());
-      setTotalResults(3);
+      setPagination({
+        page: 1, limit: 20, total: 3, totalPages: 1, hasNext: false, hasPrev: false
+      });
     } finally {
       setLoading(false);
     }
@@ -119,52 +128,61 @@ export default function SearchPage() {
 
   const getMockProperties = () => [
     {
-      id: 1,
+      id: "1",
       title: "Luxury Pearl Qatar Apartment",
-      location: "The Pearl, Doha",
-      price: 3500,
-      rating: 4.8,
-      reviews: 124,
-      images: ["/api/placeholder/400/300"],
-      type: "apartment",
+      city: "Doha",
+      area: "The Pearl",
+      coordinates: { lat: 25.3678, lng: 51.5310 },
+      monthlyPrice: 3500,
+      averageRating: 4.8,
+      reviewCount: 124,
+      photos: ["/api/placeholder/400/300"],
+      propertyType: "apartment",
       bedrooms: 2,
       bathrooms: 2,
-      guests: 4,
-      amenities: ["wifi", "parking", "pool", "gym"],
+      maxGuests: 4,
+      inUnitFeatures: ["wifi", "parking", "pool", "gym"],
       instantBook: true,
-      host: { name: "Ahmed", verified: true }
+      tier: "luxury",
+      host: { firstName: "Ahmed", lastName: "Al-Thani", hostVerified: "verified" }
     },
     {
-      id: 2,
+      id: "2",
       title: "Modern Studio in West Bay",
-      location: "West Bay, Doha",
-      price: 2200,
-      rating: 4.6,
-      reviews: 89,
-      images: ["/api/placeholder/400/300"],
-      type: "studio",
+      city: "Doha",
+      area: "West Bay",
+      coordinates: { lat: 25.3189, lng: 51.5263 },
+      monthlyPrice: 2200,
+      averageRating: 4.6,
+      reviewCount: 89,
+      photos: ["/api/placeholder/400/300"],
+      propertyType: "studio",
       bedrooms: 0,
       bathrooms: 1,
-      guests: 2,
-      amenities: ["wifi", "ac", "workspace"],
+      maxGuests: 2,
+      inUnitFeatures: ["wifi", "ac", "workspace"],
       instantBook: false,
-      host: { name: "Sara", verified: true }
+      tier: "standard",
+      host: { firstName: "Sara", lastName: "Ahmed", hostVerified: "verified" }
     },
     {
-      id: 3,
+      id: "3",
       title: "Spacious Villa with Pool",
-      location: "Al Waab, Doha",
-      price: 5500,
-      rating: 4.9,
-      reviews: 67,
-      images: ["/api/placeholder/400/300"],
-      type: "villa",
+      city: "Doha",
+      area: "Al Waab",
+      coordinates: { lat: 25.3548, lng: 51.4326 },
+      monthlyPrice: 5500,
+      averageRating: 4.9,
+      reviewCount: 67,
+      photos: ["/api/placeholder/400/300"],
+      propertyType: "villa",
       bedrooms: 4,
       bathrooms: 3,
-      guests: 8,
-      amenities: ["wifi", "parking", "pool", "kitchen"],
+      maxGuests: 8,
+      inUnitFeatures: ["wifi", "parking", "pool", "kitchen"],
       instantBook: true,
-      host: { name: "Mohammed", verified: false }
+      tier: "luxury",
+      host: { firstName: "Mohammed", lastName: "Hassan", hostVerified: "pending" }
     }
   ];
 
@@ -369,7 +387,7 @@ export default function SearchPage() {
 
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <span style={{ fontSize: "14px", color: "#717171" }}>
-              {totalResults} stays
+              {pagination.total || 0} stays
             </span>
             <select
               value={filters.sortBy}
@@ -419,7 +437,13 @@ export default function SearchPage() {
             gap: "24px"
           }}>
             {properties.map(property => (
-              <PropertyCard key={property.id} property={property} />
+              <AirbnbPropertyCard 
+                key={property.id} 
+                property={property}
+                onMouseEnter={() => setSelectedProperty(property)}
+                onMouseLeave={() => setSelectedProperty(null)}
+                selected={selectedProperty?.id === property.id}
+              />
             ))}
           </div>
         ) : (
@@ -437,26 +461,66 @@ export default function SearchPage() {
             </p>
           </div>
         )}
+
+        {/* Map */}
+        {showMap && (
+          <div style={{
+            flex: "0 0 50%",
+            position: "sticky",
+            top: "200px",
+            height: "calc(100vh - 200px)"
+          }}>
+            <PropertyMap 
+              properties={properties}
+              selectedProperty={selectedProperty}
+              onPropertySelect={setSelectedProperty}
+              center={properties.length > 0 ? properties[0].coordinates : { lat: 25.2854, lng: 51.5310 }}
+            />
+          </div>
+        )}
       </div>
 
-      {showFilters && (
-        <FilterModal
-          filters={filters}
-          setFilters={updateFilters}
-          amenitiesList={amenitiesList}
-          onClose={() => setShowFilters(false)}
-        />
-      )}
-      
-      {showAdvancedFilters && (
-        <AdvancedFilterModal
-          filters={filters}
-          setFilters={setFilters}
-          onClose={() => setShowAdvancedFilters(false)}
-          onApply={(newFilters) => {
-            updateFilters(newFilters);
-          }}
-        />
+      {/* Pagination */}
+      {!loading && properties.length > 0 && pagination.totalPages > 1 && (
+        <div style={{
+          padding: "24px 16px",
+          display: "flex",
+          justifyContent: "center",
+          gap: "8px",
+          alignItems: "center"
+        }}>
+          <button
+            disabled={!pagination.hasPrev}
+            onClick={() => updateFilters({...filters, page: filters.page - 1})}
+            style={{
+              padding: "8px 16px",
+              border: "1px solid #e0e0e0",
+              borderRadius: "8px",
+              backgroundColor: pagination.hasPrev ? "white" : "#f5f5f5",
+              cursor: pagination.hasPrev ? "pointer" : "not-allowed",
+              color: pagination.hasPrev ? "#222" : "#999"
+            }}
+          >
+            Previous
+          </button>
+          <span style={{ margin: "0 16px", fontSize: "14px", color: "#717171" }}>
+            Page {pagination.page} of {pagination.totalPages}
+          </span>
+          <button
+            disabled={!pagination.hasNext}
+            onClick={() => updateFilters({...filters, page: filters.page + 1})}
+            style={{
+              padding: "8px 16px",
+              border: "1px solid #e0e0e0",
+              borderRadius: "8px",
+              backgroundColor: pagination.hasNext ? "white" : "#f5f5f5",
+              cursor: pagination.hasNext ? "pointer" : "not-allowed",
+              color: pagination.hasNext ? "#222" : "#999"
+            }}
+          >
+            Next
+          </button>
+        </div>
       )}
 
       <style jsx>{`
