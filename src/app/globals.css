@@ -1,19 +1,28 @@
-/* Louis Vuitton Inspired Luxury Theme */
+/* Cosmic Orange Luxury Theme for Houseiana */
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* LV Orange Color Palette */
-  --primary: #FF6F00; /* Main LV Orange */
-  --primary-dark: #E65100;
-  --primary-light: #FF9233;
-  --primary-50: #FFF4E6;
-  --primary-100: #FFE4CC;
+  /* Cosmic Orange Color Palette */
+  --primary: #FF6B35; /* Main Cosmic Orange */
+  --primary-dark: #E55A2B;
+  --primary-light: #FF8A65;
+  --primary-50: #FFF8F5;
+  --primary-100: #FFF0EB;
+  
+  /* Cosmic Orange Variants */
+  --cosmic-orange-primary: #FF6B35;
+  --cosmic-orange-secondary: #F7931E;
+  --cosmic-orange-light: #FFB896;
+  --cosmic-orange-bg: #FFF8F5;
+  --cosmic-orange-surface: #FFF0EB;
+  --cosmic-orange-text: #2D1B12;
+  --cosmic-orange-text-muted: #8B5A3C;
   
   /* Luxury Colors */
-  --dark: #0A0A0A;
-  --gold: #D4AF37;
+  --dark: #2D1B12;
+  --gold: #F7931E;
   --bronze: #CD7F32;
-  --champagne: #F7E7CE;
+  --champagne: #FFF0EB;
   
   /* Base */
   --background: #FFFFFF;
@@ -37,8 +46,8 @@ html {
 
 body {
   font-family: var(--font-body);
-  color: var(--foreground);
-  background: linear-gradient(135deg, #FFFFFF 0%, #FFF4E6 50%, #FFFFFF 100%);
+  color: var(--cosmic-orange-text);
+  background: linear-gradient(135deg, #FFFFFF 0%, var(--cosmic-orange-bg) 50%, #FFFFFF 100%);
   min-height: 100vh;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -50,7 +59,7 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
   font-weight: 700;
   line-height: 1.2;
-  color: var(--dark);
+  color: var(--cosmic-orange-text);
 }
 
 /* Luxury Buttons */
@@ -65,12 +74,12 @@ h1, h2, h3, h4, h5, h6 {
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 10px 30px rgba(255, 111, 0, 0.3);
+  box-shadow: 0 10px 30px rgba(255, 107, 53, 0.3);
 }
 
 .btn-luxury:hover {
   transform: translateY(-2px);
-  box-shadow: 0 15px 40px rgba(255, 111, 0, 0.4);
+  box-shadow: 0 15px 40px rgba(255, 107, 53, 0.4);
 }
 
 /* Cards */
@@ -78,18 +87,20 @@ h1, h2, h3, h4, h5, h6 {
   background: white;
   border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 30px rgba(255, 107, 53, 0.1);
+  border: 1px solid var(--cosmic-orange-surface);
   transition: all 0.3s ease;
 }
 
 .card-luxury:hover {
   transform: translateY(-5px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 20px 40px rgba(255, 107, 53, 0.2);
+  border-color: var(--cosmic-orange-light);
 }
 
 /* Gradient Text */
 .gradient-text {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--gold) 100%);
+  background: linear-gradient(135deg, var(--cosmic-orange-primary) 0%, var(--cosmic-orange-secondary) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -101,16 +112,20 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--primary-50);
+  background: var(--cosmic-orange-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--primary);
+  background: var(--cosmic-orange-primary);
   border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cosmic-orange-secondary);
 }
 
 /* Selection */
 ::selection {
-  background: var(--primary);
+  background: var(--cosmic-orange-primary);
   color: white;
 }
